@@ -1,0 +1,50 @@
+{
+    "train_config": {
+        "checkpoint_dir": "./checkpoints_reduce_wn/",
+        "log_event_path": "./log/reduce_wn/",
+        "nepochs": 2000,
+        "learning_rate": 1e-3,
+        "eval_per_step": 5000,
+        "checkpoint_path": "",
+        "seed": 1234
+    },
+    "network_config": {
+        "wavenet_config": {
+            "out_channels":256,
+            "layers":10,
+            "stacks":1,
+            "residual_channels":512,
+            "gate_channels":512,
+            "skip_out_channels":512,
+            "kernel_size":3,
+            "dropout":0.05,
+            "cin_channels":80,
+            "gin_channels":-1,
+            "n_speakers":null,
+            "upsample_conditional_features":false,
+            "upsample_net":"ConvInUpsampleNetwork",
+            "upsample_params":{"upsample_scales": [4, 4, 4, 4]},
+            "scalar_input":false,
+            "use_speaker_embedding":false,
+            "cin_pad":0
+                 }
+    },
+    "data_config": {
+        "segment_length": 16000,
+        "sampling_rate": 22050,
+        "n_fft": 512,
+        "win_length": 512,
+        "hop_length": 128,
+        "fmin": 0.0,
+        "fmax": 8000.0,
+        "power": 1.0,
+        "f0_frame_period": 5.8
+    },
+    "dataloader_config": {
+        "num_workers": 0,
+        "shuffle": true,
+        "batch_size": 4,
+        "pin_memory": true,
+        "drop_last": true
+    }
+}

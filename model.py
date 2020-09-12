@@ -958,7 +958,7 @@ class Loss():
         # However, just in case
         loss += self.cutoff_w * self.loss(cut_f, torch.zeros_like(cut_f))
 
-        return loss
+        return loss / target.size(0)
 
     
 if __name__ == "__main__":
