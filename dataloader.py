@@ -72,12 +72,11 @@ class Wav2MelF0(torch.utils.data.Dataset):
         #wav = np.pad(wav, [0, mel.shape[1] * self.hop_length - self.segment_length], mode='constant').astype(np.float)
         _f0, t = pw.dio(wav, self.sampling_rate, frame_period=self.f0_frame_period)
         f0 = pw.stonemask(wav, _f0, t, self.sampling_rate)
-        cond = np.concatenate([mel.T, f0.astype(np.float32)])
+        cond = np.append(mel, [f0.astype(np.float32)], axis=0)
         wav = torch.from_numpy(wav.astype(np.float32))
-        mel = torch.from_numpy(mel.T)
-        f0 = torch.from_numpy(f0.astype(np.float32))
+        cond = torch.from_numpy(cond.T)
 
-        return (wav, mel, f0)
+        return (wav, cond)
 
     def __len__(self):
         return len(self.wav)
@@ -92,11 +91,11 @@ class Wav2MelF0(torch.utils.data.Dataset):
         wav = wav.astype(np.float)
         _f0, t = pw.dio(wav, self.sampling_rate, frame_period=self.f0_frame_period)
         f0 = pw.stonemask(wav, _f0, t, self.sampling_rate)[:mel.shape[1]*2]
+        cond = np.concatenate([mel.T, f0.astype(np.float32)])
         wav = torch.from_numpy(wav.astype(np.float32))
-        mel = torch.from_numpy(mel.T).unsqueeze(0)
-        f0 = torch.from_numpy(f0.astype(np.float32)).unsqueeze(0)
+        cond = torch.from_numpy(cond).unsqueeze(0)
 
-        return (wav, mel, f0)
+        return (wav, cond)
 
 if __name__ == '__main__':
     args = docopt(__doc__)
@@ -114,4 +113,4 @@ if __name__ == '__main__':
     train_loader = DataLoader(wav_data, **dataloader_config)
 
     for i, batch in tqdm(enumerate(train_loader)):
-        wav, mel, f0 = batch
+        wav, cond = batch
