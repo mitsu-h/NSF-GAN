@@ -16,6 +16,7 @@ from os.path import join
 import numpy as np
 import json
 import librosa
+import pickle
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -78,25 +79,25 @@ def load_checkpoint(path, model, optimizer, reset_optimizer=False):
     return model, total_step, epoch
 
 def eval_model(step, writer, device, model, eval_data, checkpoint_dir):
-    target_wav, mel, f0 = eval_data
-    mel, f0 = mel.to(device), f0.to(device)
+    target_wav, cond = eval_data
+    cond = cond.to(device)
 
     #prepare model for evaluation
-    model_eval = Model(in_dim=81, out_dim=1).to(device)
+    model_eval = Model(in_dim=81, out_dim=1, args=None).to(device)
     model_eval.load_state_dict(model.state_dict())
     model_eval.eval()
 
     with torch.no_grad():
-        output = model_eval(f0, mel)
+        output = model_eval(cond)
     #save
     output = output[0].cpu().data.numpy()
-    mel_output = librosa.feature.melspectrogram(output, n_fft=1024, hop_length=256, n_mels=80, fmin=0.0, fmax=8000, power=1.0)
+    mel_output = librosa.feature.melspectrogram(output, n_fft=512, hop_length=128, n_mels=80, fmin=0.0, fmax=8000, power=1.0)
     mel_output = np.log(np.abs(mel_output).clip(1e-5, 10)).astype(np.float32)
     mel_output = prepare_spec_image(mel_output)
     writer.add_image('predicted wav mel spectrogram', mel_output.transpose(2, 0, 1), step)
 
-    mel = mel[0].cpu().data.numpy()
-    mel = prepare_spec_image(mel)
+    mel = cond[0,:,:-1].cpu().data.numpy()
+    mel = prepare_spec_image(mel.T)
     writer.add_image('target wav mel spectrogram', mel.transpose(2, 0, 1), step)
 
     output /= np.max(np.abs(output))
@@ -105,12 +106,15 @@ def eval_model(step, writer, device, model, eval_data, checkpoint_dir):
     librosa.output.write_wav(path, output, sr=data_config["sampling_rate"])
 
 def train(dataset, train_loader, checkpoint_dir, log_event_path, nepochs,
-          learning_rate, eval_per_step, checkpoint_path,seed):
+          learning_rate, eval_per_step, checkpoint_path,seed, data_mean_std_path):
+    torch.manual_seed(seed)
     criterion = Loss(None)
     device = torch.device("cuda" if use_cuda else "cpu")
 
     #Model
-    model = Model(in_dim=81, out_dim=1).to(device)
+    with open(data_mean_std_path, 'rb') as f:
+        data_mean_std = pickle.load(f)
+    model = Model(in_dim=81, out_dim=1, args=None, mean_std=data_mean_std).to(device)
 
     optimizer = optim.Adam(model.parameters())
 
@@ -127,16 +131,14 @@ def train(dataset, train_loader, checkpoint_dir, log_event_path, nepochs,
     while epoch <= nepochs:
         running_loss = 0
         print("{}epoch:".format(epoch))
-        for step, (wav, mel, f0) in tqdm(enumerate(train_loader)):
-            if total_step == 0 and False:
-                writer.add_graph(model, input_to_model=[f0,mel])
+        for step, (wav, cond) in tqdm(enumerate(train_loader)):
             model.train()
             optimizer.zero_grad()
 
-            wav, mel, f0 = wav.to(device), mel.to(device), f0.to(device)
-            outputs = model(f0, mel)
+            wav, cond = wav.to(device), cond.to(device)
+            outputs = model(cond)
 
-            loss = criterion.compute(outputs[:,:data_config["segment_length"]], wav)
+            loss = criterion.compute([outputs[0][:,:data_config["segment_length"]], outputs[1]], wav)
             loss.backward()
             optimizer.step()
 
