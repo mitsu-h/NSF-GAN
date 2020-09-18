@@ -802,7 +802,7 @@ class Model(torch_nn.Module):
         # number of dilated CNN in each filter block
         self.cnn_num_in_block = 10
         # number of harmonic overtones in source
-        self.harmonic_num = 7
+        self.harmonic_num = 1
         # order of sinc-windowed-FIR-filter
         self.sinc_order = 31
 
@@ -908,7 +908,7 @@ class Loss():
         # frame shift (number of points)
         self.frame_hops = [80, 40, 640]
         # frame length
-        self.frame_lens = [320, 80, 1920]
+        self.frame_lens = [440, 80, 2640]
         # fft length
         self.fft_n = [512, 128, 2048]
         # window type in stft

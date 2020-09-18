@@ -1,10 +1,10 @@
 {
     "train_config": {
-        "checkpoint_dir": "./checkpoints/",
-        "log_event_path": "./log/test/",
+        "checkpoint_dir": "./checkpoints_melwin/",
+        "log_event_path": "./log/melwin/",
         "nepochs": 2000,
         "learning_rate": 1e-3,
-        "eval_per_step": 1,
+        "eval_per_step": 5000,
         "checkpoint_path": "",
         "seed": 1234,
         "data_mean_std_path": "./ljspeech_mean_std.pkl"
@@ -42,9 +42,9 @@
         "f0_frame_period": 5.8
     },
     "dataloader_config": {
-        "num_workers": 0,
+        "num_workers": 4,
         "shuffle": true,
-        "batch_size": 4,
+        "batch_size": 8,
         "pin_memory": true,
         "drop_last": true
     }
