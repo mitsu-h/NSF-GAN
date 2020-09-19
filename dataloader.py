@@ -91,6 +91,7 @@ class Wav2MelF0(torch.utils.data.Dataset):
         wav = wav.astype(np.float)
         _f0, t = pw.dio(wav, self.sampling_rate, frame_period=self.f0_frame_period)
         f0 = pw.stonemask(wav, _f0, t, self.sampling_rate)[:mel.shape[1]]#TODO: calculate fft_size
+        mel = mel[:,:len(f0)]
         cond = np.append(mel, [f0.astype(np.float32)], axis=0)
         wav = torch.from_numpy(wav.astype(np.float32))
         cond = torch.from_numpy(cond.T).unsqueeze(0)

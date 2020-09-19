@@ -804,7 +804,7 @@ class Model(torch_nn.Module):
         # number of harmonic overtones in source
         self.harmonic_num = 1
         # order of sinc-windowed-FIR-filter
-        self.sinc_order = 31
+        self.sinc_order = 43
 
         # the three modules
         self.m_cond = CondModuleHnSincNSF(self.input_dim, \
@@ -906,9 +906,9 @@ class Loss():
         """
         """
         # frame shift (number of points)
-        self.frame_hops = [80, 40, 640]
+        self.frame_hops = [110, 55, 882]#[80, 40, 640]
         # frame length
-        self.frame_lens = [440, 80, 2640]
+        self.frame_lens = [441, 110, 1764]#[320, 80, 1920]
         # fft length
         self.fft_n = [512, 128, 2048]
         # window type in stft
@@ -919,7 +919,7 @@ class Loss():
         self.loss = torch_nn.MSELoss()
         # weight to penalize hidden features for cut-off-frequency
         # for experiments on CMU-arctic, ATR-F009, VCTK, cutoff_w = 0.0
-        self.cutoff_w = 0.0
+        self.cutoff_w = 0.5
 
     def compute(self, outputs, target):
         """ Loss().compute(outputs, target) should return

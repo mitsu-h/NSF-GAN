@@ -78,12 +78,13 @@ def load_checkpoint(path, model, optimizer, reset_optimizer=False):
 
     return model, total_step, epoch
 
-def eval_model(step, writer, device, model, eval_data, checkpoint_dir):
+def eval_model(step, writer, device, model, eval_data, checkpoint_dir, segment_length=16000, sampling_rate=22050,
+               n_fft=512, win_length=512, hop_length=128, n_mels=80, fmin=0.0, fmax=8000, power=1.0, f0_frame_period=5.8):
     target_wav, cond = eval_data
     cond = cond.to(device)
 
     #prepare model for evaluation
-    model_eval = Model(in_dim=81, out_dim=1, args=None).to(device)
+    model_eval = Model(in_dim=n_mels+1, out_dim=1, args=None).to(device)
     model_eval.load_state_dict(model.state_dict())
     model_eval.eval()
 
@@ -91,7 +92,8 @@ def eval_model(step, writer, device, model, eval_data, checkpoint_dir):
         output = model_eval(cond)
     #save
     output = output[0].cpu().data.numpy()
-    mel_output = librosa.feature.melspectrogram(output, n_fft=512, hop_length=128, n_mels=80, fmin=0.0, fmax=8000, power=1.0)
+    mel_output = librosa.feature.melspectrogram(output, n_fft=n_fft, win_length=win_length, hop_length=hop_length,
+                                                n_mels=n_mels, fmin=fmin, fmax=fmax, power=power)
     mel_output = np.log(np.abs(mel_output).clip(1e-5, 10)).astype(np.float32)
     mel_output = prepare_spec_image(mel_output)
     writer.add_image('predicted wav mel spectrogram', mel_output.transpose(2, 0, 1), step)
@@ -148,7 +150,7 @@ def train(dataset, train_loader, checkpoint_dir, log_event_path, nepochs,
 
             if total_step % eval_per_step == 0:
                 idx = np.random.randint(0, train_loader.__len__())
-                eval_model(total_step, writer, device, model, dataset.get_all_length_data(idx), checkpoint_dir)
+                eval_model(total_step, writer, device, model, dataset.get_all_length_data(idx), checkpoint_dir, **data_config)
                 save_checkpoint(model, optimizer, total_step, checkpoint_dir, epoch)
 
         averaged_loss = running_loss / (len(train_loader))
