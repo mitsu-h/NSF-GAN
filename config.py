@@ -49,7 +49,7 @@ input_exts = ['.mfbsp', '.f0']
 #  for waveform modeling, temporal resolution of input acoustic features
 #  may be = waveform_sampling_rate * frame_shift_of_acoustic_features
 #  for example, 80 = 16000 Hz * 5 ms 
-input_reso = [128, 128]
+input_reso = [110, 110]
 
 # Whether input features should be z-normalized
 # input_norm = [normalize_feature_1, normalize_feature_2]

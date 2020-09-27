@@ -373,7 +373,7 @@ class NeuralFilterBlock(torch_nn.Module):
         
         # dilated conv layers
         tmp = [Conv1dKeepLength(hidden_size, hidden_size, x, \
-                                kernel_size, causal=True, bias=False) \
+                                kernel_size, causal=False, bias=False) \
                for x in self.dilation_s]
         self.l_convs = torch_nn.ModuleList(tmp)
                 
@@ -908,9 +908,9 @@ class Loss():
         # frame shift (number of points)
         self.frame_hops = [110, 55, 882]#[80, 40, 640]
         # frame length
-        self.frame_lens = [441, 110, 1764]#[320, 80, 1920]
+        self.frame_lens = [441, 110, 2646]#[320, 80, 1920]
         # fft length
-        self.fft_n = [512, 128, 2048]
+        self.fft_n = [512, 128, 4096]
         # window type in stft
         self.win = torch.hann_window
         # floor in log-spectrum-amplitude calculating
@@ -919,7 +919,7 @@ class Loss():
         self.loss = torch_nn.MSELoss()
         # weight to penalize hidden features for cut-off-frequency
         # for experiments on CMU-arctic, ATR-F009, VCTK, cutoff_w = 0.0
-        self.cutoff_w = 0.5
+        self.cutoff_w = 0.1
 
     def compute(self, outputs, target):
         """ Loss().compute(outputs, target) should return
@@ -958,7 +958,7 @@ class Loss():
         # However, just in case
         loss += self.cutoff_w * self.loss(cut_f, torch.zeros_like(cut_f))
 
-        return loss / target.size(0)
+        return loss
 
     
 if __name__ == "__main__":
