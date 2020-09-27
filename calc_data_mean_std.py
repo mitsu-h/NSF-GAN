@@ -49,8 +49,8 @@ if __name__ == '__main__':
         cond_var += torch.var(cond, dim=1)
 
     idx += 1
-    wav_std = torch.sqrt(wav_var) / idx
-    cond_std = torch.sqrt(cond_var) / idx
+    wav_std = torch.sqrt(wav_var / idx)
+    cond_std = torch.sqrt(cond_var / idx)
     wav_mean = wav_mean / idx
     cond_mean = cond_mean / idx
 
