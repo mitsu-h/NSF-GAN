@@ -36,29 +36,35 @@ if __name__ == '__main__':
     dataloader_config = config["dataloader_config"]
     wav_data = Wav2MelF0(wav_file_path, load_wav_to_memory, **data_config)
 
-    wav, cond = wav_data.get_all_length_data(0)
+    wav, mel, f0 = wav_data.get_all_length_data(0)
     wav_mean = torch.mean(wav)
     wav_var = torch.var(wav)
-    cond_mean = torch.mean(cond, dim=1)
-    cond_var = torch.var(cond, dim=1)
+    mel_mean = torch.mean(mel, dim=1)
+    mel_var = torch.var(mel, dim=1)
+    f0_mean = torch.mean(f0, dim=1)
+    f0_var = torch.var(f0, dim=1)
     for idx in tqdm(range(1, wav_data.__len__())):
-        wav, cond = wav_data.get_all_length_data(idx)
+        wav, mel, f0 = wav_data.get_all_length_data(idx)
         wav_mean += torch.mean(wav)
         wav_var += torch.var(wav)
-        cond_mean += torch.mean(cond, dim=1)
-        cond_var += torch.var(cond, dim=1)
+        mel_mean += torch.mean(mel, dim=1)
+        mel_var += torch.var(mel, dim=1)
+        f0_mean += torch.mean(f0, dim=1)
+        f0_var += torch.var(f0, dim=1)
 
     idx += 1
     wav_std = torch.sqrt(wav_var / idx)
-    cond_std = torch.sqrt(cond_var / idx)
+    mel_std = torch.sqrt(mel_var / idx)
+    f0_std = torch.sqrt(f0_var / idx)
     wav_mean = wav_mean / idx
-    cond_mean = cond_mean / idx
+    mel_mean = mel_mean / idx
+    f0_mean = f0_mean / idx
 
     wav_mean = wav_mean.data.numpy()
     wav_std = wav_std.data.numpy()
-    cond_mean = cond_mean.data.numpy()[0]
-    cond_std = cond_std.data.numpy()[0]
+    cond_mean = np.append(mel_mean.data.numpy()[0], f0_mean.data.numpy()[0])
+    cond_std = np.append(mel_std.data.numpy()[0] , f0_std.data.numpy()[0])
 
     data_mean_std = [cond_mean, cond_std, wav_mean[np.newaxis], wav_std[np.newaxis]]
-    with open('ljspeech_mean_std.pkl', 'wb') as f:
+    with open('diff_mean_std.pkl', 'wb') as f:
         pickle.dump(data_mean_std, f)

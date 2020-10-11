@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData" autoUpload="Always" serverName="uworl@133.38.201.221:22:6006 key" remoteFilesAllowedToDisappearOnAutoupload="false">
+    <serverData>
+      <paths name="uworl@133.38.201.221:22:6006 key">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/hn-sinc-nsf-9" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+    </serverData>
+    <option name="myAutoUpload" value="ALWAYS" />
+  </component>
+</project>

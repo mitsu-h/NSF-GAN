@@ -72,11 +72,13 @@ class Wav2MelF0(torch.utils.data.Dataset):
         #wav = np.pad(wav, [0, mel.shape[1] * self.hop_length - self.segment_length], mode='constant').astype(np.float)
         _f0, t = pw.dio(wav, self.sampling_rate, frame_period=self.f0_frame_period)
         f0 = pw.stonemask(wav, _f0, t, self.sampling_rate)
-        cond = np.append(mel, [f0.astype(np.float32)], axis=0)
+        #cond = np.append(mel, [f0.astype(np.float32)], axis=0)
         wav = torch.from_numpy(wav.astype(np.float32))
-        cond = torch.from_numpy(cond.T)
+        #cond = torch.from_numpy(cond.T)
+        mel = torch.from_numpy(mel).T
+        f0 = torch.from_numpy(f0.astype(np.float32)).unsqueeze(-1)
 
-        return (wav, cond)
+        return (wav, mel, f0)
 
     def __len__(self):
         return len(self.wav)
@@ -91,12 +93,14 @@ class Wav2MelF0(torch.utils.data.Dataset):
         wav = wav.astype(np.float)
         _f0, t = pw.dio(wav, self.sampling_rate, frame_period=self.f0_frame_period)
         f0 = pw.stonemask(wav, _f0, t, self.sampling_rate)[:mel.shape[1]]#TODO: calculate fft_size
-        mel = mel[:,:len(f0)]
-        cond = np.append(mel, [f0.astype(np.float32)], axis=0)
+        #mel = mel[:,:len(f0)]
+        #cond = np.append(mel, [f0.astype(np.float32)], axis=0)
         wav = torch.from_numpy(wav.astype(np.float32))
-        cond = torch.from_numpy(cond.T).unsqueeze(0)
+        #cond = torch.from_numpy(cond.T).unsqueeze(0)
+        mel = torch.from_numpy(mel).T.unsqueeze(0)
+        f0 = torch.from_numpy(f0.astype(np.float32)).unsqueeze(-1).unsqueeze(0)
 
-        return (wav, cond)
+        return (wav, mel, f0)
 
 if __name__ == '__main__':
     args = docopt(__doc__)

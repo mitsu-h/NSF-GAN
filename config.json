@@ -1,13 +1,13 @@
 {
     "train_config": {
-        "checkpoint_dir": "./checkpoints_dft_param/",
-        "log_event_path": "./log/dft_param/",
+        "checkpoint_dir": "./checkpoints_feature_len_diff/",
+        "log_event_path": "./log/feature_len_diff/",
         "nepochs": 2000,
         "learning_rate": 1e-3,
         "eval_per_step": 5000,
         "checkpoint_path": "",
         "seed": 1234,
-        "data_mean_std_path": "./ljspeech_mean_std.pkl"
+        "data_mean_std_path": "./diff_mean_std.pkl"
     },
     "network_config": {
         "wavenet_config": {
@@ -33,13 +33,13 @@
     "data_config": {
         "segment_length": 16000,
         "sampling_rate": 22050,
-        "n_fft": 512,
-        "win_length": 441,
-        "hop_length": 110,
+        "n_fft": 1024,
+        "win_length": 1024,
+        "hop_length": 256,
         "fmin": 0.0,
         "fmax": 8000.0,
         "power": 1.0,
-        "f0_frame_period": 5
+        "f0_frame_period": 5.8
     },
     "dataloader_config": {
         "num_workers": 4,

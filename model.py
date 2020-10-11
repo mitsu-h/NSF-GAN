@@ -760,7 +760,7 @@ class FilterModuleHnSincNSF(torch_nn.Module):
         noi_signal = self.l_tv_filtering(noi_component, hp_coef)
 
         # get output 
-        return har_signal + noi_signal
+        return har_signal, noi_signal
         
         
 
@@ -790,8 +790,7 @@ class Model(torch_nn.Module):
         # dimension of hidden features in filter blocks
         self.hidden_dim = 64
         # upsampling rate on input acoustic features (16kHz * 5ms = 80)
-        # assume input_reso has the same value
-        self.upsamp_rate = prj_conf.input_reso[0]
+        self.upsamp_rate = prj_conf.input_reso[1]
         # sampling rate (Hz)
         self.sampling_rate = prj_conf.wav_samp_rate
         # CNN kernel size in filter blocks        
@@ -805,6 +804,9 @@ class Model(torch_nn.Module):
         self.harmonic_num = 1
         # order of sinc-windowed-FIR-filter
         self.sinc_order = 43
+
+        #upsample mel to match f0 length
+        self.mel_up = UpSampleLayer(1, prj_conf.input_reso[0]/prj_conf.input_reso[1])
 
         # the three modules
         self.m_cond = CondModuleHnSincNSF(self.input_dim, \
@@ -868,15 +870,15 @@ class Model(torch_nn.Module):
         """
         return y * self.output_std + self.output_mean
     
-    def forward(self, x):
+    def forward(self, mel, f0):
         """ definition of forward method 
         Assume x (batchsize=1, length, dim)
         Return output(batchsize=1, length)
         """
-        # assume x[:, :, -1] is F0, denormalize F0
-        f0 = x[:, :, -1:]
+        #upsample mel to match f0 length
+        mel = self.mel_up(mel)
         # normalize the input features data
-        feat = self.normalize_input(x)
+        feat = self.normalize_input(torch.cat([mel, f0], dim=1))
 
         # condition module
         # feature-to-filter-block, f0-up-sampled, cut-off-f-for-sinc,
@@ -889,14 +891,17 @@ class Model(torch_nn.Module):
         
         # neural filter module (including sinc-based FIR filtering)
         # output
-        output = self.m_filter(har_source, noi_source, cond_feat, cut_f)
+        har_signal, noi_signal = self.m_filter(har_source, noi_source, cond_feat, cut_f)
+        har_signal = har_signal.squeeze(-1)
+        noi_signal = noi_signal.squeeze(-1)
+        output = har_signal + noi_signal
         
         if self.training:
             # just in case we need to penalize the hidden feauture for 
-            # cut-off-freq. 
-            return [output.squeeze(-1), hid_cut_f]
+            # cut-off-freq.
+            return [output, hid_cut_f]
         else:
-            return output.squeeze(-1)
+            return output, har_signal, noi_signal
     
     
 class Loss():
@@ -919,7 +924,7 @@ class Loss():
         self.loss = torch_nn.MSELoss()
         # weight to penalize hidden features for cut-off-frequency
         # for experiments on CMU-arctic, ATR-F009, VCTK, cutoff_w = 0.0
-        self.cutoff_w = 0.1
+        self.cutoff_w = 0.0
 
     def compute(self, outputs, target):
         """ Loss().compute(outputs, target) should return
