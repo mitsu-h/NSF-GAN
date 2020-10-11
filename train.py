@@ -16,6 +16,7 @@ from os.path import join
 import numpy as np
 import json
 import librosa
+import librosa.display
 import pickle
 import matplotlib
 matplotlib.use('Agg')

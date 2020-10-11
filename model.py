@@ -806,7 +806,7 @@ class Model(torch_nn.Module):
         self.sinc_order = 43
 
         #upsample mel to match f0 length
-        self.mel_up = UpSampleLayer(1, prj_conf.input_reso[0]/prj_conf.input_reso[1])
+        self.mel_up = UpSampleLayer(80, prj_conf.input_reso[0]/prj_conf.input_reso[1])
 
         # the three modules
         self.m_cond = CondModuleHnSincNSF(self.input_dim, \
@@ -878,7 +878,7 @@ class Model(torch_nn.Module):
         #upsample mel to match f0 length
         mel = self.mel_up(mel)
         # normalize the input features data
-        feat = self.normalize_input(torch.cat([mel, f0], dim=1))
+        feat = self.normalize_input(torch.cat([mel, f0], dim=2))
 
         # condition module
         # feature-to-filter-block, f0-up-sampled, cut-off-f-for-sinc,
