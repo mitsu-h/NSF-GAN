@@ -803,10 +803,13 @@ class Model(torch_nn.Module):
         # number of harmonic overtones in source
         self.harmonic_num = 1
         # order of sinc-windowed-FIR-filter
-        self.sinc_order = 43
+        self.sinc_order = 31
 
         #upsample mel to match f0 length
-        self.mel_up = UpSampleLayer(80, prj_conf.input_reso[0]/prj_conf.input_reso[1])
+        if prj_conf.input_reso[0] != prj_conf.input_reso[1]:
+            self.mel_up = UpSampleLayer(80, prj_conf.input_reso[0]/prj_conf.input_reso[1])
+        else:
+            self.mel_up = None
 
         # the three modules
         self.m_cond = CondModuleHnSincNSF(self.input_dim, \
@@ -876,7 +879,8 @@ class Model(torch_nn.Module):
         Return output(batchsize=1, length)
         """
         #upsample mel to match f0 length
-        mel = self.mel_up(mel)
+        if self.mel_up is not None:
+            mel = self.mel_up(mel)[:,:f0.size(1),:]
         # normalize the input features data
         feat = self.normalize_input(torch.cat([mel, f0], dim=2))
 
@@ -911,11 +915,11 @@ class Loss():
         """
         """
         # frame shift (number of points)
-        self.frame_hops = [110, 55, 882]#[80, 40, 640]
+        self.frame_hops = [80, 40, 640]
         # frame length
-        self.frame_lens = [441, 110, 2646]#[320, 80, 1920]
+        self.frame_lens = [320, 80, 1920]
         # fft length
-        self.fft_n = [512, 128, 4096]
+        self.fft_n = [512, 128, 2048]
         # window type in stft
         self.win = torch.hann_window
         # floor in log-spectrum-amplitude calculating

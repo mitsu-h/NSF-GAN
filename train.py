@@ -159,7 +159,7 @@ def train(dataset, train_loader, checkpoint_dir, log_event_path, nepochs,
         data_mean_std = pickle.load(f)
     model = Model(in_dim=81, out_dim=1, args=None, mean_std=data_mean_std).to(device)
 
-    optimizer = optim.Adam(model.parameters())
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     writer = SummaryWriter(log_event_path)
 
@@ -181,7 +181,7 @@ def train(dataset, train_loader, checkpoint_dir, log_event_path, nepochs,
             wav, mel, f0 = wav.to(device), mel.to(device), f0.to(device)
             outputs = model(mel, f0)
 
-            loss = criterion.compute([outputs[0][:,:data_config["segment_length"]], outputs[1]], wav)
+            loss = criterion.compute([outputs[0][:,:wav.size(-1)], outputs[1]], wav)
             loss.backward()
             optimizer.step()
 

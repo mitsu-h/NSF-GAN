@@ -1,13 +1,13 @@
 {
     "train_config": {
-        "checkpoint_dir": "./checkpoints_feature_len_diff/",
-        "log_event_path": "./log/feature_len_diff/",
-        "nepochs": 2000,
-        "learning_rate": 1e-3,
+        "checkpoint_dir": "./checkpoints_all_length/lr_1e-4/",
+        "log_event_path": "./log/all_length/lr_1e-4/",
+        "nepochs": 50,
+        "learning_rate": 1e-4,
         "eval_per_step": 5000,
         "checkpoint_path": "",
         "seed": 1234,
-        "data_mean_std_path": "./diff_mean_std.pkl"
+        "data_mean_std_path": "./ljspeech_mean_std.pkl"
     },
     "network_config": {
         "wavenet_config": {
@@ -31,20 +31,20 @@
                  }
     },
     "data_config": {
-        "segment_length": 16000,
-        "sampling_rate": 22050,
-        "n_fft": 1024,
-        "win_length": 1024,
-        "hop_length": 256,
+        "segment_length": 160000,
+        "sampling_rate": 16000,
+        "n_fft": 512,
+        "win_length": 320,
+        "hop_length": 80,
         "fmin": 0.0,
         "fmax": 8000.0,
         "power": 1.0,
-        "f0_frame_period": 5.8
+        "f0_frame_period": 5.0
     },
     "dataloader_config": {
         "num_workers": 4,
         "shuffle": true,
-        "batch_size": 8,
+        "batch_size": 1,
         "pin_memory": true,
         "drop_last": true
     }

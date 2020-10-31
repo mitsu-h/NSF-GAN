@@ -49,7 +49,7 @@ input_exts = ['.mfbsp', '.f0']
 #  for waveform modeling, temporal resolution of input acoustic features
 #  may be = waveform_sampling_rate * frame_shift_of_acoustic_features
 #  for example, 80 = 16000 Hz * 5 ms 
-input_reso = [256, 128]
+input_reso = [80, 80]
 
 # Whether input features should be z-normalized
 # input_norm = [normalize_feature_1, normalize_feature_2]
@@ -64,7 +64,7 @@ output_norm = [False]
 
 # Waveform sampling rate
 #  wav_samp_rate can be None if no waveform data is used
-wav_samp_rate = 22050
+wav_samp_rate = 16000
 
 # Truncating input sequences so that the maximum length = truncate_seq
 #  When truncate_seq is larger, more GPU mem required
