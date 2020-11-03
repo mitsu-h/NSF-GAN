@@ -1,7 +1,7 @@
 {
     "train_config": {
-        "checkpoint_dir": "./checkpoints_all_length/lr_1e-4/",
-        "log_event_path": "./log/all_length/lr_1e-4/",
+        "checkpoint_dir": "./checkpoints/cut_wav/",
+        "log_event_path": "./log/cut_wav/",
         "nepochs": 50,
         "learning_rate": 1e-4,
         "eval_per_step": 5000,

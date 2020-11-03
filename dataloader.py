@@ -57,14 +57,13 @@ class Wav2MelF0(torch.utils.data.Dataset):
         wav = self.wav[idx] if self.isMemory else librosa.load(self.wav[idx], sr=self.sampling_rate)[0]
         wav_length = len(wav)
         if wav_length >= self.segment_length:
-            wav = wav[:self.segment_length]
-            '''
+            #wav = wav[:self.segment_length]
             max_start = wav_length - self.segment_length
             start = np.random.randint(0, max_start)
             wav = wav[start:start+self.segment_length]
         else:
             wav = np.pad(wav, [0, self.segment_length - wav_length], mode='constant')
-            '''
+
 
         #make mel-spectrogram
         mel = librosa.feature.melspectrogram(wav, n_fft=self.n_fft, win_length=self.win_length, hop_length=self.hop_length,
