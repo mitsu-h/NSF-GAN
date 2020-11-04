@@ -31,7 +31,7 @@
                  }
     },
     "data_config": {
-        "segment_length": 160000,
+        "segment_length": 32000,
         "sampling_rate": 16000,
         "n_fft": 512,
         "win_length": 320,
