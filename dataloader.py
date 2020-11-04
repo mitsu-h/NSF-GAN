@@ -54,16 +54,14 @@ class Wav2MelF0(torch.utils.data.Dataset):
         self.f0_frame_period = f0_frame_period
 
     def __getitem__(self, idx):
-        wav = self.wav[idx] if self.isMemory else librosa.load(self.wav[idx], sr=self.sampling_rate)[0]
+        wav = self.wav[idx] if self.isMemory else librosa.load(self.wav[idx])[0]
         wav_length = len(wav)
         if wav_length >= self.segment_length:
-            #wav = wav[:self.segment_length]
             max_start = wav_length - self.segment_length
             start = np.random.randint(0, max_start)
             wav = wav[start:start+self.segment_length]
         else:
             wav = np.pad(wav, [0, self.segment_length - wav_length], mode='constant')
-
 
         #make mel-spectrogram
         mel = librosa.feature.melspectrogram(wav, n_fft=self.n_fft, win_length=self.win_length, hop_length=self.hop_length,
@@ -86,7 +84,7 @@ class Wav2MelF0(torch.utils.data.Dataset):
         return len(self.wav)
 
     def get_all_length_data(self, idx):
-        wav = self.wav[idx] if self.isMemory else librosa.load(self.wav[idx], sr=self.sampling_rate)[0]
+        wav = self.wav[idx] if self.isMemory else librosa.load(self.wav[idx])[0]
         # make mel-spectrogram
         mel = librosa.feature.melspectrogram(wav, n_fft=self.n_fft, win_length=self.win_length, hop_length=self.hop_length,
                                              n_mels=self.n_mels, fmin=self.fmin, fmax=self.fmax, power=self.power)
@@ -94,9 +92,9 @@ class Wav2MelF0(torch.utils.data.Dataset):
         # make fundamental frequency
         wav = wav.astype(np.float)
         _f0, t = pw.dio(wav, self.sampling_rate, frame_period=self.f0_frame_period)
-        f0 = pw.stonemask(wav, _f0, t, self.sampling_rate)[:mel.shape[1]*2]
-        #mel = mel[:,:len(f0)]
-        #cond = np.append(mel, [f0.astype(np.float32)], axis=0)
+        f0 = pw.stonemask(wav, _f0, t, self.sampling_rate)[:mel.shape[1]]#TODO: calculate fft_size
+        mel = mel[:,:len(f0)]
+        cond = np.append(mel, [f0.astype(np.float32)], axis=0)
         wav = torch.from_numpy(wav.astype(np.float32))
         #cond = torch.from_numpy(cond.T).unsqueeze(0)
         mel = torch.from_numpy(mel).T.unsqueeze(0)
