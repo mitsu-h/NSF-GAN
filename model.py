@@ -370,6 +370,7 @@ class NeuralFilterBlock(torch_nn.Module):
         self.l_ff_1 = torch_nn.Linear(signal_size, hidden_size, \
                                       bias=False)
         self.l_ff_1_tanh = torch_nn.Tanh()
+        self.l_ff_1_bn = torch_nn.BatchNorm1d(hidden_size)
         
         # dilated conv layers
         tmp = [Conv1dKeepLength(hidden_size, hidden_size, x, \
@@ -381,9 +382,11 @@ class NeuralFilterBlock(torch_nn.Module):
         self.l_ff_2 = torch_nn.Linear(hidden_size, hidden_size//4, \
                                       bias=False)
         self.l_ff_2_tanh = torch_nn.Tanh()
+        self.l_ff_2_bn = torch_nn.BatchNorm1d(hidden_size//4)
         self.l_ff_3 = torch_nn.Linear(hidden_size//4, signal_size, \
                                       bias=False)
-        self.l_ff_3_tanh = torch_nn.Tanh()        
+        self.l_ff_3_tanh = torch_nn.Tanh()
+        self.l_ff_3_bn = torch_nn.BatchNorm1d(signal_size)
 
         # a simple scale
         self.scale = torch_nn.Parameter(torch.tensor([0.1]), 
@@ -397,7 +400,8 @@ class NeuralFilterBlock(torch_nn.Module):
         Output: (batchsize=1, length, signal_size)
         """
         # expand dimension
-        tmp_hidden = self.l_ff_1_tanh(self.l_ff_1(signal))
+        tmp_hidden = self.l_ff_1_tanh(self.l_ff_1(signal)).transpose(1,2)
+        tmp_hidden = self.l_ff_1_bn(tmp_hidden).transpose(1,2)
         
         # loop over dilated convs
         # output of a d-conv is input + context + d-conv(input)
@@ -408,8 +412,10 @@ class NeuralFilterBlock(torch_nn.Module):
         tmp_hidden = tmp_hidden * self.scale
         
         # compress the dimesion and skip-add
-        tmp_hidden = self.l_ff_2_tanh(self.l_ff_2(tmp_hidden))
-        tmp_hidden = self.l_ff_3_tanh(self.l_ff_3(tmp_hidden))
+        tmp_hidden = self.l_ff_2_tanh(self.l_ff_2(tmp_hidden)).transpose(1,2)
+        tmp_hidden = self.l_ff_2_bn(tmp_hidden).transpose(1,2)
+        tmp_hidden = self.l_ff_3_tanh(self.l_ff_3(tmp_hidden)).transpose(1,2)
+        tmp_hidden = self.l_ff_3_bn(tmp_hidden).transpose(1,2)
         output_signal = tmp_hidden + signal
         
         return output_signal
@@ -676,6 +682,7 @@ class SourceModuleHnNSF(torch_nn.Module):
         # to merge source harmonics into a single excitation
         self.l_linear = torch_nn.Linear(harmonic_num+1, 1)
         self.l_tanh = torch_nn.Tanh()
+        self.l_bn = torch_nn.BatchNorm1d(1)
 
     def forward(self, x):
         """
@@ -686,11 +693,11 @@ class SourceModuleHnNSF(torch_nn.Module):
         """
         # source for harmonic branch
         sine_wavs, uv, _ = self.l_sin_gen(x)
-        sine_merge = self.l_tanh(self.l_linear(sine_wavs))
+        sine_merge = self.l_tanh(self.l_linear(sine_wavs)).transpose(1,2)
 
         # source for noise branch, in the same shape as uv
         noise = torch.randn_like(uv) * self.sine_amp / 3
-        return sine_merge, noise, uv
+        return self.l_bn(sine_merge).transpose(1,2), noise, uv
         
         
 # For Filter module
@@ -792,6 +799,7 @@ class Model(torch_nn.Module):
         # upsampling rate on input acoustic features (16kHz * 5ms = 80)
         self.upsamp_rate = prj_conf.input_reso[1]
         # sampling rate (Hz)
+        #TODO:config.pyとconfig.jsonを統合する
         self.sampling_rate = prj_conf.wav_samp_rate
         # CNN kernel size in filter blocks        
         self.cnn_kernel_s = 3

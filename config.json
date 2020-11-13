@@ -1,11 +1,11 @@
 {
     "train_config": {
-        "checkpoint_dir": "./checkpoints/cut_wav/",
-        "log_event_path": "./log/cut_wav/",
-        "nepochs": 50,
-        "learning_rate": 1e-4,
+        "checkpoint_dir": "./checkpoints/cut_wav/add_batch_norm_lr_3e-4",
+        "log_event_path": "./log/cut_wav/add_batch_norm_lr_3e-4",
+        "nepochs": 100,
+        "learning_rate": 3e-4,
         "eval_per_step": 5000,
-        "checkpoint_path": "",
+        "checkpoint_path": "./checkpoints/cut_wav/add_batch_norm_lr_3e-4/checkpoint_step000130000.pth",
         "seed": 1234,
         "data_mean_std_path": "./ljspeech_mean_std.pkl"
     },
@@ -44,7 +44,7 @@
     "dataloader_config": {
         "num_workers": 4,
         "shuffle": true,
-        "batch_size": 1,
+        "batch_size": 5,
         "pin_memory": true,
         "drop_last": true
     }
