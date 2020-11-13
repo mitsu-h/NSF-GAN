@@ -5,7 +5,7 @@
       <paths name="uworl@133.38.201.221:22:6006 key">
         <serverdata>
           <mappings>
-            <mapping deploy="/hn-sinc-nsf-9" local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="/proposal-nsf" local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>
