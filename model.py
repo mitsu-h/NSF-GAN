@@ -501,6 +501,20 @@ class SineGen(torch_nn.Module):
             # get the sines
             sines = torch.cos(i_phase * 2 * np.pi)
         return  sines
+
+    def _f02rosenberg(self, f0_values):
+        T0 = torch.reciprocal(f0_values)
+        t = torch.arange(0.0, T0.size(1)) / self.sampling_rate
+        t = t[None,:,None] % T0
+        T0[T0==float('nan')] = 0
+        t1 = 0.4 * T0
+        t2 = 0.16 * T0
+        rosenberg = torch.zeros_like(T0)
+
+        rosenberg[t <= t1] = (3 * (t / t1) ** 2 - 2 * (t / t1) ** 3)[t <= t1]
+        rosenberg[(t > t1) & (t <= (t1 + t2))] = \
+            (1 - ((t - t1) / t2) ** 2)[(t > t1) & (t <= (t1 + t2))]
+        return rosenberg
     
     
     def forward(self, f0):
@@ -511,16 +525,19 @@ class SineGen(torch_nn.Module):
         output uv: tensor(batchsize=1, length, 1)
         """
         with torch.no_grad():
-            phase_buf = torch.zeros(f0.shape[0], f0.shape[1], self.dim, \
-                                    device=f0.device)
-            # fundamental component
-            phase_buf[:, :, 0] = f0[:, :, 0]
-            for idx in np.arange(self.harmonic_num):
-                # idx + 2: the (idx+1)-th overtone, (idx+2)-th harmonic
-                phase_buf[:, :, idx+1] = phase_buf[:, :, 0] * (idx+2)
-                
-            # generate sine waveforms
-            sine_waves = self._f02sine(phase_buf) * self.sine_amp
+            if self.flag_for_pulse:
+                sine_waves = self._f02rosenberg(f0) * self.sine_amp
+            else:
+                phase_buf = torch.zeros(f0.shape[0], f0.shape[1], self.dim, \
+                                        device=f0.device)
+                # fundamental component
+                phase_buf[:, :, 0] = f0[:, :, 0]
+                for idx in np.arange(self.harmonic_num):
+                    # idx + 2: the (idx+1)-th overtone, (idx+2)-th harmonic
+                    phase_buf[:, :, idx+1] = phase_buf[:, :, 0] * (idx+2)
+
+                # generate sine waveforms
+                sine_waves = self._f02sine(phase_buf) * self.sine_amp
             
             # generate uv signal
             #uv = torch.ones(f0.shape)
@@ -663,7 +680,7 @@ class SourceModuleHnNSF(torch_nn.Module):
     uv (batchsize, length, 1)
     """
     def __init__(self, sampling_rate, harmonic_num=0, sine_amp=0.1, 
-                 add_noise_std=0.003, voiced_threshod=0):
+                 add_noise_std=0.003, voiced_threshod=0, flag_for_pulse=True):
         super(SourceModuleHnNSF, self).__init__()
         
         self.sine_amp = sine_amp
@@ -671,7 +688,7 @@ class SourceModuleHnNSF(torch_nn.Module):
 
         # to produce sine waveforms
         self.l_sin_gen = SineGen(sampling_rate, harmonic_num,
-                                 sine_amp, add_noise_std, voiced_threshod)
+                                 sine_amp, add_noise_std, voiced_threshod, flag_for_pulse=flag_for_pulse)
 
         # to merge source harmonics into a single excitation
         self.l_linear = torch_nn.utils.spectral_norm(torch_nn.Linear(harmonic_num+1, 1))
@@ -973,5 +990,3 @@ class Loss():
     
 if __name__ == "__main__":
     print("Definition of model")
-
-    
