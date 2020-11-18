@@ -335,7 +335,7 @@ class UpSampleLayer(torch_nn.Module):
         super(UpSampleLayer, self).__init__()
         # wrap a up_sampling layer
         self.scale_factor = up_sampling_factor
-        self.l_upsamp = torch_nn.Upsample(scale_factor=self.scale_factor, mode='linear')
+        self.l_upsamp = torch_nn.Upsample(scale_factor=self.scale_factor)#, mode='linear')f0 smoothしないほうが良い
         if smoothing:
             self.l_ave1 = MovingAverage(feature_dim, self.scale_factor)
             self.l_ave2 = MovingAverage(feature_dim, self.scale_factor)
@@ -504,7 +504,7 @@ class SineGen(torch_nn.Module):
 
     def _f02rosenberg(self, f0_values):
         T0 = torch.reciprocal(f0_values)
-        t = torch.arange(0.0, T0.size(1)) / self.sampling_rate
+        t = torch.arange(0.0, T0.size(1), device=T0.device) / self.sampling_rate
         t = t[None,:,None] % T0
         T0[T0==float('nan')] = 0
         t1 = 0.4 * T0
@@ -606,9 +606,9 @@ class CondModuleHnSincNSF(torch_nn.Module):
                                          kernel_s = self.cnn_kernel_s)
         # Upsampling layer for hidden features
         self.l_upsamp = UpSampleLayer(self.output_dim, \
-                                      self.up_sample, False)
+                                      self.up_sample, True)
         # separate layer for up-sampling normalized F0 values
-        self.l_upsamp_f0_hi = UpSampleLayer(1, self.up_sample, False)
+        self.l_upsamp_f0_hi = UpSampleLayer(1, self.up_sample, True)
         
         # Upsampling for F0: don't smooth up-sampled F0
         self.l_upsamp_F0 = UpSampleLayer(1, self.up_sample, False)
@@ -819,7 +819,7 @@ class Model(torch_nn.Module):
         # number of dilated CNN in each filter block
         self.cnn_num_in_block = 10
         # number of harmonic overtones in source
-        self.harmonic_num = 1
+        self.harmonic_num = 0
         # order of sinc-windowed-FIR-filter
         self.sinc_order = 31
 
