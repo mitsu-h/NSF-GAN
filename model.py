@@ -502,18 +502,15 @@ class SineGen(torch_nn.Module):
             sines = torch.cos(i_phase * 2 * np.pi)
         return  sines
 
-    def _f02rosenberg(self, f0_values):
-        T0 = torch.reciprocal(f0_values)
-        t = torch.arange(0.0, T0.size(1), device=T0.device) / self.sampling_rate
-        t = t[None,:,None] % T0
-        T0[T0==float('nan')] = 0
-        t1 = 0.4 * T0
-        t2 = 0.16 * T0
-        rosenberg = torch.zeros_like(T0)
-
-        rosenberg[t <= t1] = (3 * (t / t1) ** 2 - 2 * (t / t1) ** 3)[t <= t1]
-        rosenberg[(t > t1) & (t <= (t1 + t2))] = \
-            (1 - ((t - t1) / t2) ** 2)[(t > t1) & (t <= (t1 + t2))]
+    def _f02rosenberg(self, f0_values, t1_ratio=0.4, t2_ratio=0.16):
+        rad = f0_values / self.sampling_rate    # normalized frequency(0~2pi ->0~1)
+        rad_cum = torch.cumsum(rad, 1)              # rad
+        rad_cum = rad_cum - torch.trunc(rad_cum)    # rad within (0, 1)
+        rosenberg = torch.zeros_like(rad_cum)
+        ind1 = rad_cum < t1_ratio
+        ind2 = (rad_cum >= t1_ratio)*(rad_cum < t1_ratio+t2_ratio)
+        rosenberg[ind1] = 1.0 - torch.cos(rad_cum[ind1]/t1_ratio*np.pi)
+        rosenberg[ind2] = torch.cos((rad_cum[ind2]-t1_ratio)/t2_ratio * np.pi/2)
         return rosenberg
     
     
