@@ -44,11 +44,8 @@ def prepare_spec_image(spectrogram):
     spectrogram = np.flip(spectrogram, axis=0)  # flip against freq axis
     return np.uint8(cm.magma(spectrogram) * 255)
 
-def prepare_melspec(wav, segment_length=8000, sampling_rate=22050,
-                    n_fft=1024, win_length=1024,hop_length=256,n_mels=80, fmin=0.0, fmax=8000.0, power=1.0,
-                    f0_frame_period=5.8):
-    mel = librosa.feature.melspectrogram(wav, n_fft=n_fft, win_length=win_length, hop_length=hop_length,
-                                         n_mels=n_mels, fmin=fmin, fmax=fmax,power=power)
+def prepare_melspec(wav, mel_config):
+    mel = librosa.feature.melspectrogram(wav, **mel_config)
     mel = np.log(np.abs(mel).clip(1e-5, 10)).astype(np.float32)
     mel = prepare_spec_image(mel)
     return mel.transpose(2, 0, 1)
@@ -88,13 +85,12 @@ def load_checkpoint(path, model, optimizer, reset_optimizer=False):
 
     return model, total_step, epoch
 
-def eval_model(step, writer, device, model, eval_data, checkpoint_dir, segment_length=16000, sampling_rate=22050,
-               n_fft=512, win_length=512, hop_length=128, n_mels=80, fmin=0.0, fmax=8000, power=1.0, f0_frame_period=5.8):
+def eval_model(step, writer, device, model, eval_data, checkpoint_dir, mel_config):
     target_wav, mel, f0 = eval_data
     mel, f0 = mel.to(device), f0.to(device)
 
     #prepare model for evaluation
-    model_eval = Model(in_dim=n_mels+1, out_dim=1, args=None).to(device)
+    model_eval = Model(in_dim=81, out_dim=1, args=None).to(device)
     model_eval.load_state_dict(model.state_dict())
     model_eval.eval()
 
@@ -102,8 +98,7 @@ def eval_model(step, writer, device, model, eval_data, checkpoint_dir, segment_l
         output, har_signal, noi_signal = model_eval(mel, f0)
     #save
     output = output[0].cpu().data.numpy()
-    mel_output = librosa.feature.melspectrogram(output, n_fft=n_fft, win_length=win_length, hop_length=hop_length,
-                                                n_mels=n_mels, fmin=fmin, fmax=fmax, power=power)
+    mel_output = librosa.feature.melspectrogram(output, **mel_config)
     mel_output = np.log(np.abs(mel_output).clip(1e-5, 10)).astype(np.float32)
     mel_output = prepare_spec_image(mel_output)
     writer.add_image('predicted wav mel spectrogram', mel_output.transpose(2, 0, 1), step)
@@ -138,7 +133,7 @@ def eval_model(step, writer, device, model, eval_data, checkpoint_dir, segment_l
     writer.add_figure('noise signal output', fig, step)
     plt.close()
 
-    writer.add_image('noise signal mel spectrogram', prepare_melspec(noi_signal, **data_config), step)
+    writer.add_image('noise signal mel spectrogram', prepare_melspec(noi_signal, data_config["mel_config"]), step)
 
     har_signal = har_signal[0].cpu().data.numpy()
     fig = plt.figure()
@@ -146,7 +141,7 @@ def eval_model(step, writer, device, model, eval_data, checkpoint_dir, segment_l
     writer.add_figure('harmonic signal output', fig, step)
     plt.close()
 
-    writer.add_image('harmonic signal mel spectrogram', prepare_melspec(har_signal, **data_config), step)
+    writer.add_image('harmonic signal mel spectrogram', prepare_melspec(har_signal, data_config["mel_config"]), step)
 
 def train(dataset, train_loader, checkpoint_dir, log_event_path, nepochs,
           learning_rate, eval_per_step, checkpoint_path,seed, data_mean_std_path):
@@ -191,7 +186,7 @@ def train(dataset, train_loader, checkpoint_dir, log_event_path, nepochs,
 
             if total_step % eval_per_step == 0:
                 idx = np.random.randint(0, train_loader.__len__())
-                eval_model(total_step, writer, device, model, dataset.get_all_length_data(idx), checkpoint_dir, **data_config)
+                eval_model(total_step, writer, device, model, dataset.get_all_length_data(idx), checkpoint_dir, data_config["mel_config"])
                 save_checkpoint(model, optimizer, total_step, checkpoint_dir, epoch)
 
         averaged_loss = running_loss / (len(train_loader))

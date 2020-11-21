@@ -368,21 +368,21 @@ class NeuralFilterBlock(torch_nn.Module):
 
         # ff layer to expand dimension
         self.l_ff_1 = torch_nn.utils.spectral_norm(torch_nn.Linear(signal_size, hidden_size, \
-                                      bias=False))
+                                      bias=True))
         self.l_ff_1_tanh = torch_nn.Tanh()
         
         # dilated conv layers
         tmp = [Conv1dKeepLength(hidden_size, hidden_size, x, \
-                                kernel_size, causal=False, bias=False) \
+                                kernel_size, causal=False, bias=True) \
                for x in self.dilation_s]
         self.l_convs = torch_nn.ModuleList(tmp)
                 
         # ff layer to de-expand dimension
         self.l_ff_2 = torch_nn.utils.spectral_norm(torch_nn.Linear(hidden_size, hidden_size//4, \
-                                      bias=False))
+                                      bias=True))
         self.l_ff_2_tanh = torch_nn.Tanh()
         self.l_ff_3 = torch_nn.utils.spectral_norm(torch_nn.Linear(hidden_size//4, signal_size, \
-                                      bias=False))
+                                      bias=True))
         self.l_ff_3_tanh = torch_nn.Tanh()
 
         # a simple scale

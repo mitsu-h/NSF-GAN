@@ -30,8 +30,7 @@ def print_config_data(config):
             print('\t %s : %s' % (c, conf[c]))
 
 class Wav2MelF0(torch.utils.data.Dataset):
-    def __init__(self, wav_file_path, load_wav_to_memory=False, segment_length=16000, sampling_rate=22050, n_fft=1024, win_length=1024,hop_length=256,
-                 n_mels=80, fmin=0.0, fmax=8000.0, power=1.0, f0_frame_period=5.8):
+    def __init__(self, wav_file_path, load_wav_to_memory, segment_length, sampling_rate, f0_frame_period, mel_config):
         self.isMemory = load_wav_to_memory
         wav_list = glob(wav_file_path)
         if load_wav_to_memory:
@@ -44,14 +43,8 @@ class Wav2MelF0(torch.utils.data.Dataset):
 
         self.sampling_rate = sampling_rate
         self.segment_length = segment_length
-        self.n_fft = n_fft
-        self.win_length = win_length
-        self.hop_length = hop_length
-        self.n_mels = n_mels
-        self.fmin = fmin
-        self.fmax = fmax
-        self.power = power
         self.f0_frame_period = f0_frame_period
+        self.mel_config = mel_config
 
     def __getitem__(self, idx):
         wav = self.wav[idx] if self.isMemory else librosa.load(self.wav[idx], sr=self.sampling_rate)[0]
@@ -64,8 +57,7 @@ class Wav2MelF0(torch.utils.data.Dataset):
             wav = np.pad(wav, [0, self.segment_length - wav_length], mode='constant')
 
         #make mel-spectrogram
-        mel = librosa.feature.melspectrogram(wav, n_fft=self.n_fft, win_length=self.win_length, hop_length=self.hop_length,
-                                             n_mels=self.n_mels,fmin=self.fmin,fmax=self.fmax,power=self.power)
+        mel = librosa.feature.melspectrogram(wav, **self.mel_config)
         mel = np.log(np.abs(mel).clip(1e-5,10)).astype(np.float32)
         #make fundamental frequency
         wav = wav.astype(np.float)
@@ -86,8 +78,7 @@ class Wav2MelF0(torch.utils.data.Dataset):
     def get_all_length_data(self, idx):
         wav = self.wav[idx] if self.isMemory else librosa.load(self.wav[idx], sr=self.sampling_rate)[0]
         # make mel-spectrogram
-        mel = librosa.feature.melspectrogram(wav, n_fft=self.n_fft, win_length=self.win_length, hop_length=self.hop_length,
-                                             n_mels=self.n_mels, fmin=self.fmin, fmax=self.fmax, power=self.power)
+        mel = librosa.feature.melspectrogram(wav, **self.mel_config)
         mel = np.log(np.abs(mel).clip(1e-5, 10)).astype(np.float32)
         # make fundamental frequency
         wav = wav.astype(np.float)
@@ -118,4 +109,4 @@ if __name__ == '__main__':
     train_loader = DataLoader(wav_data, **dataloader_config)
 
     for i, batch in tqdm(enumerate(train_loader)):
-        wav, cond = batch
+        wav, mel, f0 = batch

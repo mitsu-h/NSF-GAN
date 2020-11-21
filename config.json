@@ -1,7 +1,7 @@
 {
     "train_config": {
-        "checkpoint_dir": "./checkpoints/new_rosenberg/",
-        "log_event_path": "./log/new_rosenberg/",
+        "checkpoint_dir": "./checkpoints/rosenberg_bias/",
+        "log_event_path": "./log/rosenberg_bias/",
         "nepochs": 100,
         "learning_rate": 1e-4,
         "eval_per_step": 5000,
@@ -33,13 +33,16 @@
     "data_config": {
         "segment_length": 32000,
         "sampling_rate": 16000,
-        "n_fft": 512,
-        "win_length": 320,
-        "hop_length": 80,
-        "fmin": 0.0,
-        "fmax": 8000.0,
-        "power": 1.0,
-        "f0_frame_period": 5.0
+        "f0_frame_period": 5.0,
+        "mel_config": {
+            "n_fft": 512,
+            "win_length": 320,
+            "hop_length": 80,
+            "n_mels": 80,
+            "fmin": 0.0,
+            "fmax": 8000.0,
+            "power": 1.0
+        }
     },
     "dataloader_config": {
         "num_workers": 4,
