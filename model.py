@@ -945,6 +945,30 @@ class Loss():
         # for experiments on CMU-arctic, ATR-F009, VCTK, cutoff_w = 0.0
         self.cutoff_w = 0.0
 
+    def calc_sp(self, wav, n_fft, hop_length, frame_len):
+        """
+        calcurate spectrum envelope pytorch
+        """
+        #unfold
+        wav = wav.unfold(1, n_fft, hop_length)
+
+        #hann_window
+        hann = torch_nn_func.pad(torch.hann_window(frame_len), pad=((n_fft-frame_len)//2, (n_fft-frame_len)//2+1))
+        wav = wav * hann[None,None,:wav.size(-1)]
+
+        #calc spectrogram
+        spec = torch.fft.fft(wav, n=n_fft)
+        fft_db = 20 * torch.log10(spec + 1)
+
+        ceps_db = torch.real(torch.fft.ifft(fft_db, n=n_fft))
+        lifter = torch.ones_like(ceps_db)
+        lifter[:,:,50:lifter.size(1) - 50] = 0 #lifterは一旦固定
+        ceps_lif = ceps_db * lifter
+        sp = torch.fft.fft(ceps_lif, n=n_fft)
+
+        return torch.abs(sp)
+
+
     def compute(self, outputs, target):
         """ Loss().compute(outputs, target) should return
         the Loss in torch.tensor format

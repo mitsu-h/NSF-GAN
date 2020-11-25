@@ -5,7 +5,7 @@
         "nepochs": 100,
         "learning_rate": 1e-4,
         "eval_per_step": 5000,
-        "checkpoint_path": "",
+        "checkpoint_path": "./checkpoints/rosenberg_ReLU/checkpoint_step000785000.pth",
         "seed": 1234,
         "data_mean_std_path": "./ljspeech_mean_std.pkl"
     },
