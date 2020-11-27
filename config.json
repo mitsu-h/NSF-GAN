@@ -1,13 +1,13 @@
 {
     "train_config": {
-        "checkpoint_dir": "./checkpoints/cmu/",
-        "log_event_path": "./log/cmu/",
+        "checkpoint_dir": "./checkpoints/wav_normalization/",
+        "log_event_path": "./log/wav_normalization/",
         "nepochs": 100,
         "learning_rate": 1e-4,
         "eval_per_step": 5000,
-        "checkpoint_path": "./checkpoints/cmu/checkpoint_step000040000.pth",
+        "checkpoint_path": "",
         "seed": 1234,
-        "data_mean_std_path": "./cmu_us_awb.pkl"
+        "data_mean_std_path": "./downsample_lj_mean_std.pkl"
     },
     "network_config": {
         "wavenet_config": {
@@ -35,8 +35,8 @@
         "sampling_rate": 16000,
         "f0_frame_period": 5.0,
         "mel_config": {
-            "n_fft": 512,
-            "win_length": 320,
+            "n_fft": 1024,
+            "win_length": 400,
             "hop_length": 80,
             "n_mels": 80,
             "fmin": 0.0,

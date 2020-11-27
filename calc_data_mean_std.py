@@ -6,7 +6,7 @@ usage: dataloader.py [options]
 
 options:
     --config=<json>                 path of configuration parameter [default: ./config.json]
-    --wav_file_path=<path>          path of wav_file [default: F:/LJSpeech-1.1/wavs/*]
+    --wav_file_path=<path>          path of wav_file [default: F:/Downsample_LJ/*]
     --save_pkl_path=<path>          path of pickle file [default: ./mean_std.pkl]
     --load_wav_to_memory            Do you want to load all wavefile?
 """
