@@ -7,6 +7,7 @@ usage: dataloader.py [options]
 options:
     --config=<json>                 path of configuration parameter [default: ./config.json]
     --wav_file_path=<path>          path of wav_file [default: F:/LJSpeech-1.1/wavs/*]
+    --save_pkl_path=<path>          path of pickle file [default: ./mean_std.pkl]
     --load_wav_to_memory            Do you want to load all wavefile?
 """
 from docopt import docopt
@@ -28,6 +29,7 @@ if __name__ == '__main__':
     args = docopt(__doc__)
     wav_file_path = args["--wav_file_path"]
     load_wav_to_memory = args["--load_wav_to_memory"]
+    save_path = args["--save_pkl_path"]
     with open(args["--config"]) as f:
         data = f.read()
     config = json.loads(data)
@@ -66,5 +68,5 @@ if __name__ == '__main__':
     cond_std = np.append(mel_std.data.numpy()[0] , f0_std.data.numpy()[0])
 
     data_mean_std = [cond_mean, cond_std, wav_mean[np.newaxis], wav_std[np.newaxis]]
-    with open('diff_mean_std.pkl', 'wb') as f:
+    with open(save_path, 'wb') as f:
         pickle.dump(data_mean_std, f)
