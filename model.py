@@ -79,7 +79,7 @@ class Conv1dKeepLength(torch_nn.Conv1d):
             self.pad_ri = dilation_s * (kernel_s - 1) - self.pad_le
 
         if tanh:
-            self.l_ac = torch_nn.PReLU()
+            self.l_ac = torch_nn.Tanh()
         else:
             self.l_ac = torch_nn.Identity()
         
@@ -369,7 +369,7 @@ class NeuralFilterBlock(torch_nn.Module):
         # ff layer to expand dimension
         self.l_ff_1 = torch_nn.utils.spectral_norm(torch_nn.Linear(signal_size, hidden_size, \
                                       bias=False))
-        self.l_ff_1_tanh = torch_nn.PReLU()
+        self.l_ff_1_tanh = torch_nn.Tanh()
         
         # dilated conv layers
         tmp = [Conv1dKeepLength(hidden_size, hidden_size, x, \
@@ -380,10 +380,10 @@ class NeuralFilterBlock(torch_nn.Module):
         # ff layer to de-expand dimension
         self.l_ff_2 = torch_nn.utils.spectral_norm(torch_nn.Linear(hidden_size, hidden_size//4, \
                                       bias=False))
-        self.l_ff_2_tanh = torch_nn.PReLU()
+        self.l_ff_2_tanh = torch_nn.Tanh()
         self.l_ff_3 = torch_nn.utils.spectral_norm(torch_nn.Linear(hidden_size//4, signal_size, \
                                       bias=False))
-        self.l_ff_3_tanh = torch_nn.PReLU()
+        self.l_ff_3_tanh = torch_nn.Tanh()
 
         # a simple scale
         self.scale = torch_nn.Parameter(torch.tensor([0.1]), 
@@ -689,7 +689,7 @@ class SourceModuleHnNSF(torch_nn.Module):
 
         # to merge source harmonics into a single excitation
         self.l_linear = torch_nn.utils.spectral_norm(torch_nn.Linear(harmonic_num+1, 1))
-        self.l_tanh = torch_nn.PReLU()
+        self.l_tanh = torch_nn.Tanh()
 
     def forward(self, x):
         """
