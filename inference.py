@@ -38,7 +38,7 @@ use_cuda = torch.cuda.is_available()
 if use_cuda:
     cudnn.benchmark = False
 
-def infer(mel, f0, model_path, data_mean_std_path='ljspeech_mean_std.pkl'):
+def infer(mel, f0, model_path, data_mean_std_path='downsample_lj_mean_std.pkl'):
     device = torch.device("cuda" if use_cuda else "cpu")
     mel, f0 = mel.to(device), f0.to(device)
     with open(data_mean_std_path, 'rb') as f:
@@ -48,7 +48,7 @@ def infer(mel, f0, model_path, data_mean_std_path='ljspeech_mean_std.pkl'):
     model.eval()
 
     with torch.no_grad():
-        output = model(mel, f0)
+        output, _, _ = model(mel, f0)
 
     output = output[0].squeeze().cpu().data.numpy()
     mel_output = librosa.feature.melspectrogram(output, **data_config["mel_config"])
@@ -86,7 +86,7 @@ if __name__ == '__main__':
     save_path = os.path.join(save_dir, save_name)
     save_mel_path = os.path.join(save_dir, save_mel_name)
 
-    librosa.output.write_wav(save_path, output/0.6, sr=data_config["sampling_rate"])
+    librosa.output.write_wav(save_path, output, sr=data_config["sampling_rate"])
     Image.fromarray(mel_output).save(save_mel_path)
     librosa.display.waveplot(output, sr=data_config["sampling_rate"])
     plt.savefig(save_path.replace('.wav', '_waveform.png'), format='png')

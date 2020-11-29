@@ -87,7 +87,6 @@ def load_checkpoint(path, model, optimizer, reset_optimizer=False):
 
 def eval_model(step, writer, device, model, eval_data, checkpoint_dir, mel_config):
     target_wav, mel, f0 = eval_data
-    target_wav = target_wav.to(device)
     mel, f0 = mel.to(device), f0.to(device)
 
     #prepare model for evaluation
@@ -98,7 +97,6 @@ def eval_model(step, writer, device, model, eval_data, checkpoint_dir, mel_confi
     with torch.no_grad():
         output, har_signal, noi_signal = model_eval(mel, f0)
     #save
-    output = model_eval.denormalize_output(output)
     output = output[0].cpu().data.numpy()
     mel_output = librosa.feature.melspectrogram(output, **mel_config)
     mel_output = np.log(np.abs(mel_output).clip(1e-5, 10)).astype(np.float32)
@@ -119,7 +117,6 @@ def eval_model(step, writer, device, model, eval_data, checkpoint_dir, mel_confi
     librosa.output.write_wav(path, output, sr=data_config["sampling_rate"])
 
     # save natural audio
-    target_wav = model_eval.denormalize_output(target_wav)
     target_wav = target_wav.cpu().data.numpy()
     fig = plt.figure()
     librosa.display.waveplot(target_wav, sr=data_config["sampling_rate"])
@@ -156,8 +153,6 @@ def train(dataset, train_loader, checkpoint_dir, log_event_path, nepochs,
     with open(data_mean_std_path, 'rb') as f:
         data_mean_std = pickle.load(f)
     model = Model(in_dim=81, out_dim=1, args=None, mean_std=data_mean_std).to(device)
-    dataset.wav_mean = data_mean_std[2][0]
-    dataset.wav_std = data_mean_std[3][0]
 
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
