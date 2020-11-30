@@ -1,7 +1,7 @@
 {
     "train_config": {
-        "checkpoint_dir": "./checkpoints/wav_normalization_Tanh/",
-        "log_event_path": "./log/wav_normalization_Tanh/",
+        "checkpoint_dir": "./checkpoints/db_norm/",
+        "log_event_path": "./log/db_norm/",
         "nepochs": 100,
         "learning_rate": 1e-4,
         "eval_per_step": 5000,

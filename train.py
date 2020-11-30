@@ -111,7 +111,7 @@ def eval_model(step, writer, device, model, eval_data, checkpoint_dir, mel_confi
     librosa.display.waveplot(output, sr=data_config["sampling_rate"])
     writer.add_figure('output', fig, step)
     plt.close()
-    output /= np.max(np.abs(output))
+    #output /= np.max(np.abs(output))
     writer.add_audio('predicted audio signal', output, step, sample_rate=data_config["sampling_rate"])
     path = join(checkpoint_dir, 'predicted_signal_checkpoint{}.wav'.format(step))
     librosa.output.write_wav(path, output, sr=data_config["sampling_rate"])
@@ -122,7 +122,7 @@ def eval_model(step, writer, device, model, eval_data, checkpoint_dir, mel_confi
     librosa.display.waveplot(target_wav, sr=data_config["sampling_rate"])
     writer.add_figure('target', fig, step)
     plt.close()
-    target_wav /= np.max(np.abs(target_wav))
+    #target_wav /= np.max(np.abs(target_wav))
     writer.add_audio('natural audio', target_wav, step, sample_rate=data_config["sampling_rate"])
 
     # save other output
