@@ -677,7 +677,7 @@ class SourceModuleHnNSF(torch_nn.Module):
     uv (batchsize, length, 1)
     """
     def __init__(self, sampling_rate, harmonic_num=0, sine_amp=0.1, 
-                 add_noise_std=0.003, voiced_threshod=0, flag_for_pulse=True):
+                 add_noise_std=0.003, voiced_threshod=0, flag_for_pulse=False):
         super(SourceModuleHnNSF, self).__init__()
         
         self.sine_amp = sine_amp
@@ -816,7 +816,7 @@ class Model(torch_nn.Module):
         # number of dilated CNN in each filter block
         self.cnn_num_in_block = 10
         # number of harmonic overtones in source
-        self.harmonic_num = 0
+        self.harmonic_num = 9
         # order of sinc-windowed-FIR-filter
         self.sinc_order = 31
 
