@@ -14,6 +14,7 @@ import torch
 import torch.nn as torch_nn
 import torch.nn.functional as torch_nn_func
 import config as prj_conf
+import torch.fft
 
 __author__ = "Xin Wang"
 __email__ = "wangxin@nii.ac.jp"
@@ -926,7 +927,7 @@ class Model(torch_nn.Module):
 class Loss():
     """ Wrapper to define loss function 
     """
-    def __init__(self, args):
+    def __init__(self, device):
         """
         """
         # frame shift (number of points)
@@ -945,6 +946,8 @@ class Loss():
         # for experiments on CMU-arctic, ATR-F009, VCTK, cutoff_w = 0.0
         self.cutoff_w = 0.0
 
+        self.device = device
+
     def calc_sp(self, wav, n_fft, hop_length, frame_len):
         """
         calcurate spectrum envelope pytorch
@@ -953,12 +956,12 @@ class Loss():
         wav = wav.unfold(1, n_fft, hop_length)
 
         #hann_window
-        hann = torch_nn_func.pad(torch.hann_window(frame_len), pad=((n_fft-frame_len)//2, (n_fft-frame_len)//2+1))
+        hann = torch_nn_func.pad(torch.hann_window(frame_len, device=self.device), pad=((n_fft-frame_len)//2, (n_fft-frame_len)//2+1))
         wav = wav * hann[None,None,:wav.size(-1)]
 
         #calc spectrogram
         spec = torch.fft.fft(wav, n=n_fft)
-        fft_db = 20 * torch.log10(spec + 1)
+        fft_db = 20 * torch.log10(torch.abs(spec) + 1)
 
         ceps_db = torch.real(torch.fft.ifft(fft_db, n=n_fft))
         lifter = torch.ones_like(ceps_db)
@@ -966,7 +969,7 @@ class Loss():
         ceps_lif = ceps_db * lifter
         sp = torch.fft.fft(ceps_lif, n=n_fft)
 
-        return torch.abs(sp)
+        return torch.abs(sp[:,:,n_fft//2+1])
 
 
     def compute(self, outputs, target):
@@ -987,11 +990,12 @@ class Loss():
         loss = 0
         for frame_shift, frame_len, fft_p in \
             zip(self.frame_hops, self.frame_lens, self.fft_n):
+
             x_stft = torch.stft(output, fft_p, frame_shift, frame_len, \
-                                window=self.win(frame_len), onesided=True,
+                                window=self.win(frame_len, device=self.device), onesided=True,
                                 pad_mode="constant")
             y_stft = torch.stft(target, fft_p, frame_shift, frame_len, \
-                                window=self.win(frame_len), onesided=True,
+                                window=self.win(frame_len, device=self.device), onesided=True,
                                 pad_mode="constant")
             x_sp_amp = torch.log(torch.norm(x_stft, 2, -1).pow(2) + \
                                    self.amp_floor)

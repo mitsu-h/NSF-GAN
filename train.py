@@ -146,8 +146,8 @@ def eval_model(step, writer, device, model, eval_data, checkpoint_dir, mel_confi
 def train(dataset, train_loader, checkpoint_dir, log_event_path, nepochs,
           learning_rate, eval_per_step, checkpoint_path,seed, data_mean_std_path):
     torch.manual_seed(seed)
-    criterion = Loss(None)
     device = torch.device("cuda" if use_cuda else "cpu")
+    criterion = Loss(device)
 
     #Model
     with open(data_mean_std_path, 'rb') as f:
