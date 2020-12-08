@@ -6,7 +6,7 @@ usage: train.py [options]
 
 options:
     --config=<json>                 path of configuration parameter [default: ./config.json]
-    --wav_file_path=<path>          path of wav_file [default: F:/Downsample_LJ/*]
+    --wav_file_path=<path>          path of wav_file [default: F:/Downsample_LJ/]
     --load_wav_to_memory            Do you want to load all wavefile?
 """
 from docopt import docopt
@@ -185,7 +185,7 @@ def train(dataset, train_loader, checkpoint_dir, log_event_path, nepochs,
             running_loss += loss.item()
 
             if total_step % eval_per_step == 0:
-                idx = np.random.randint(0, train_loader.__len__())
+                idx = np.random.randint(0, len(dataset.val_wav))
                 eval_model(total_step, writer, device, model, dataset.get_all_length_data(idx), checkpoint_dir, data_config["mel_config"])
                 save_checkpoint(model, optimizer, total_step, checkpoint_dir, epoch)
 

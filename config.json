@@ -1,7 +1,7 @@
 {
     "train_config": {
-        "checkpoint_dir": "./checkpoints/sp_stft_mix/",
-        "log_event_path": "./log/sp_stft_mix/",
+        "checkpoint_dir": "./checkpoints/nsf/",
+        "log_event_path": "./log_div_data/nsf/",
         "nepochs": 100,
         "learning_rate": 1e-4,
         "eval_per_step": 5000,

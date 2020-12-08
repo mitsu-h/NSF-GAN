@@ -6,7 +6,7 @@ usage: dataloader.py [options]
 
 options:
     --config=<json>                 path of configuration parameter [default: ./config.json]
-    --wav_file_path=<path>          path of wav_file [default: F:/LJSpeech-1.1/wavs/*]
+    --wav_file_path=<dir>          path of wav_file [default: F:/LJSpeech-1.1/wavs/]
     --load_wav_to_memory            Do you want to load all wavefile?
 """
 from docopt import docopt
@@ -17,7 +17,9 @@ import numpy as np
 import json
 from glob import glob
 import librosa
+from os.path import join
 import pyworld as pw
+import pickle
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -32,14 +34,11 @@ def print_config_data(config):
 class Wav2MelF0(torch.utils.data.Dataset):
     def __init__(self, wav_file_path, load_wav_to_memory, segment_length, sampling_rate, f0_frame_period, mel_config):
         self.isMemory = load_wav_to_memory
-        wav_list = glob(wav_file_path)
-        if load_wav_to_memory:
-            self.wav = []
-            for wave_path in tqdm(wav_list):
-                wav, sr = librosa.load(wave_path, sr=sampling_rate)
-                self.wav.append(wav)
-        else:
-            self.wav = wav_list
+        self.wav_file_dir = wav_file_path
+        with open(join(wav_file_path, 'train_list.txt'), 'rb') as f:
+            self.train_wav = pickle.load(f)
+        with open(join(wav_file_path, 'val_list.txt'), 'rb') as f:
+            self.val_wav = pickle.load(f)
 
         self.sampling_rate = sampling_rate
         self.segment_length = segment_length
@@ -47,7 +46,7 @@ class Wav2MelF0(torch.utils.data.Dataset):
         self.mel_config = mel_config
 
     def __getitem__(self, idx):
-        wav = self.wav[idx] if self.isMemory else librosa.load(self.wav[idx], sr=self.sampling_rate)[0]
+        wav = librosa.load(join(self.wav_file_dir, self.train_wav[idx]), sr=self.sampling_rate)[0]
         wav_length = len(wav)
         if wav_length >= self.segment_length:
             max_start = wav_length - self.segment_length
@@ -73,10 +72,10 @@ class Wav2MelF0(torch.utils.data.Dataset):
         return (wav, mel, f0)
 
     def __len__(self):
-        return len(self.wav)
+        return len(self.train_wav)
 
     def get_all_length_data(self, idx):
-        wav = self.wav[idx] if self.isMemory else librosa.load(self.wav[idx], sr=self.sampling_rate)[0]
+        wav = librosa.load(join(self.wav_file_dir, self.val_wav[idx]), sr=self.sampling_rate)[0]
         # make mel-spectrogram
         mel = librosa.feature.melspectrogram(wav, **self.mel_config)
         mel = np.log(np.abs(mel).clip(1e-5, 10)).astype(np.float32)
