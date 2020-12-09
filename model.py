@@ -667,7 +667,7 @@ class CondModuleHnSincNSF(torch_nn.Module):
         self.l_blstm = BLSTMLayer(input_dim, self.blstm_s)
 
         # the CNN layer (+1 dim for cut_off_frequence of sinc filter)
-        self.l_conv1d = teepLength(
+        self.l_conv1d = Conv1dKeepLength(
             self.blstm_s, self.output_dim, dilation_s=1, kernel_s=self.cnn_kernel_s
         )
         # Upsampling layer for hidden features
