@@ -42,6 +42,8 @@ class BLSTMLayer(torch_nn.Module):
             sys.exit(1)
         # bi-directional LSTM
         self.l_blstm = torch_nn.LSTM(input_dim, output_dim // 2, bidirectional=True)
+        # cannot apply spectral_norm. so, add under line
+        # https://github.com/pytorch/pytorch/issues/39311
         name_pre = "weight"
         name = name_pre + "_hh_l0"
         torch_nn.utils.spectral_norm(self.l_blstm, name)
@@ -1026,6 +1028,76 @@ class Model(torch_nn.Module):
             return output, har_signal, noi_signal
 
 
+class ParallelWaveGANDiscriminator(torch.nn.Module):
+    """Parallel WaveGAN Discriminator module."""
+
+    def __init__(
+        self,
+        in_channels=1,
+        out_channels=1,
+        kernel_size=3,
+        layers=10,
+        conv_channels=64,
+        dilation_factor=1,
+        bias=False,
+    ):
+        """Initialize Parallel WaveGAN Discriminator module.
+        Args:
+            in_channels (int): Number of input channels.
+            out_channels (int): Number of output channels.
+            kernel_size (int): Number of output channels.
+            layers (int): Number of conv layers.
+            conv_channels (int): Number of chnn layers.
+            dilation_factor (int): Dilation factor. For example, if dilation_factor = 2,
+                the dilation will be 2, 4, 8, ..., and so on.
+            nonlinear_activation (str): Nonlinear function after each conv.
+            nonlinear_activation_params (dict): Nonlinear function parameters
+            bias (bool): Whether to use bias parameter in conv.
+            use_weight_norm (bool) Whether to use weight norm.
+                If set to true, it will be applied to all of the conv layers.
+        """
+        super(ParallelWaveGANDiscriminator, self).__init__()
+        assert (kernel_size - 1) % 2 == 0, "Not support even number kernel size."
+        assert dilation_factor > 0, "Dilation factor must be > 0."
+        self.conv_layers = torch.nn.ModuleList()
+        conv_in_channels = in_channels
+        for i in range(layers - 1):
+            if i == 0:
+                dilation = 1
+            else:
+                dilation = i if dilation_factor == 1 else dilation_factor ** i
+                conv_in_channels = conv_channels
+            conv_layer = [
+                Conv1dKeepLength(
+                    conv_in_channels,
+                    conv_channels,
+                    dilation,
+                    kernel_size,
+                    bias=bias,
+                ),
+            ]
+            self.conv_layers += conv_layer
+        last_conv_layer = Conv1dKeepLength(
+            conv_in_channels,
+            out_channels,
+            1,
+            kernel_size,
+            bias=bias,
+        )
+        self.conv_layers += [last_conv_layer]
+
+    def forward(self, x):
+        """Calculate forward propagation.
+        Args:
+            x (Tensor): Input noise signal (B, 1, T).
+        Returns:
+            Tensor: Output tensor (B, 1, T)
+        """
+        for f in self.conv_layers:
+            x = f(x)
+        return x
+
+
 class Loss:
     """Wrapper to define loss function"""
 
@@ -1049,33 +1121,7 @@ class Loss:
 
         self.device = device
 
-    def calc_sp(self, wav, n_fft, hop_length, frame_len):
-        """
-        calcurate spectrum envelope pytorch
-        """
-        # unfold
-        wav = wav.unfold(1, n_fft, hop_length)
-
-        # hann_window
-        hann = torch_nn_func.pad(
-            torch.hann_window(frame_len, device=self.device),
-            pad=((n_fft - frame_len) // 2, (n_fft - frame_len) // 2 + 1),
-        )
-        wav = wav * hann[None, None, : wav.size(-1)]
-
-        # calc spectrogram
-        spec = torch.fft.fft(wav, n=n_fft)
-        fft_db = 20 * torch.log10(torch.abs(spec) + 1)
-
-        ceps_db = torch.real(torch.fft.ifft(fft_db, n=n_fft))
-        lifter = torch.ones_like(ceps_db)
-        lifter[:, :, 50 : lifter.size(1) - 50] = 0  # lifterは一旦固定
-        ceps_lif = ceps_db * lifter
-        sp = torch.fft.fft(ceps_lif, n=n_fft)
-
-        return torch.abs(sp[:, :, n_fft // 2 + 1])
-
-    def compute(self, outputs, target):
+    def stft_loss(self, outputs, target):
         """Loss().compute(outputs, target) should return
         the Loss in torch.tensor format
         Assume output and target as (batchsize=1, length)
@@ -1125,6 +1171,14 @@ class Loss:
         loss += self.cutoff_w * self.loss(cut_f, torch.zeros_like(cut_f))
 
         return loss
+
+    def adversarial_loss(self, fake):
+        return self.loss(fake, fake.new_ones(fake.size()))
+
+    def discriminator_loss(self, real, fake):
+        real_loss = self.loss(real, real.new_ones(real.size()))
+        fake_loss = self.loss(fake, fake.new_zeros(fake.size()))
+        return real_loss + fake_loss
 
 
 if __name__ == "__main__":
