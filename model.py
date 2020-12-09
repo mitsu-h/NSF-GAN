@@ -41,9 +41,12 @@ class BLSTMLayer(torch_nn.Module):
             print("BLSTMLayer expects a layer size of even number")
             sys.exit(1)
         # bi-directional LSTM
-        self.l_blstm = torch_nn.utils.spectral_norm(
-            torch_nn.LSTM(input_dim, output_dim // 2, bidirectional=True)
-        )
+        self.l_blstm = torch_nn.LSTM(input_dim, output_dim // 2, bidirectional=True)
+        name_pre = "weight"
+        name = name_pre + "_hh_l0"
+        torch_nn.utils.spectral_norm(self.l_blstm, name)
+        name = name_pre + "_ih_l0"
+        torch_nn.utils.spectral_norm(self.l_blstm, name)
 
     def forward(self, x):
         # permute to (length, batchsize=1, dim)
@@ -147,7 +150,7 @@ class MovingAverage(Conv1dKeepLength):
             pad_mode=pad_mode,
         )
         # set the weighting coefficients
-        torch_nn.init.constant_(self.weight, 1 / window_len)
+        torch_nn.init.constant_(self.conv.weight, 1 / window_len)
         # turn off grad for this layer
         for p in self.parameters():
             p.requires_grad = False
