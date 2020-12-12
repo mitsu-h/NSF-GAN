@@ -1028,7 +1028,7 @@ class Model(torch_nn.Module):
             return output, har_signal, noi_signal
 
 
-class ParallelWaveGANDiscriminator(torch.nn.Module):
+class Discriminator(torch.nn.Module):
     """Parallel WaveGAN Discriminator module."""
 
     def __init__(
@@ -1036,7 +1036,7 @@ class ParallelWaveGANDiscriminator(torch.nn.Module):
         in_channels=1,
         out_channels=1,
         kernel_size=3,
-        layers=10,
+        layers=3,
         conv_channels=64,
         dilation_factor=1,
         bias=False,
@@ -1056,35 +1056,15 @@ class ParallelWaveGANDiscriminator(torch.nn.Module):
             use_weight_norm (bool) Whether to use weight norm.
                 If set to true, it will be applied to all of the conv layers.
         """
-        super(ParallelWaveGANDiscriminator, self).__init__()
+        super(Discriminator, self).__init__()
         assert (kernel_size - 1) % 2 == 0, "Not support even number kernel size."
         assert dilation_factor > 0, "Dilation factor must be > 0."
         self.conv_layers = torch.nn.ModuleList()
         conv_in_channels = in_channels
-        for i in range(layers - 1):
-            if i == 0:
-                dilation = 1
-            else:
-                dilation = i if dilation_factor == 1 else dilation_factor ** i
-                conv_in_channels = conv_channels
-            conv_layer = [
-                Conv1dKeepLength(
-                    conv_in_channels,
-                    conv_channels,
-                    dilation,
-                    kernel_size,
-                    bias=bias,
-                ),
-            ]
+        for i in range(layers):
+            conv_layer = [NeuralFilterBlock(conv_in_channels, conv_channels)]
             self.conv_layers += conv_layer
-        last_conv_layer = Conv1dKeepLength(
-            conv_in_channels,
-            out_channels,
-            1,
-            kernel_size,
-            bias=bias,
-        )
-        self.conv_layers += [last_conv_layer]
+        # self.last_layer = torch_nn.Linear(in_channels, out_channels, bias=False)
 
     def forward(self, x):
         """Calculate forward propagation.
@@ -1093,8 +1073,10 @@ class ParallelWaveGANDiscriminator(torch.nn.Module):
         Returns:
             Tensor: Output tensor (B, 1, T)
         """
+        context = torch.zeros_like(x)
         for f in self.conv_layers:
-            x = f(x)
+            x = f(x, context)
+        # return torch.sigmoid(self.last_layer(x))
         return x
 
 
@@ -1115,6 +1097,7 @@ class Loss:
         self.amp_floor = 0.00001
         # loss function
         self.loss = torch_nn.MSELoss()
+        self.gan_loss = torch_nn.MSELoss()  # BCELoss()
         # weight to penalize hidden features for cut-off-frequency
         # for experiments on CMU-arctic, ATR-F009, VCTK, cutoff_w = 0.0
         self.cutoff_w = 0.0
@@ -1170,15 +1153,15 @@ class Loss:
         # However, just in case
         loss += self.cutoff_w * self.loss(cut_f, torch.zeros_like(cut_f))
 
-        return loss
+        return loss / 3
 
     def adversarial_loss(self, fake):
-        return self.loss(fake, fake.new_ones(fake.size()))
+        return self.gan_loss(fake, fake.new_ones(fake.size()))
 
     def discriminator_loss(self, real, fake):
-        real_loss = self.loss(real, real.new_ones(real.size()))
-        fake_loss = self.loss(fake, fake.new_zeros(fake.size()))
-        return real_loss + fake_loss
+        real_loss = self.gan_loss(real, real.new_ones(real.size()))
+        fake_loss = self.gan_loss(fake, fake.new_zeros(fake.size()))
+        return real_loss, fake_loss
 
 
 if __name__ == "__main__":
