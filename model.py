@@ -42,13 +42,13 @@ class BLSTMLayer(torch_nn.Module):
             sys.exit(1)
         # bi-directional LSTM
         self.l_blstm = torch_nn.LSTM(input_dim, output_dim // 2, bidirectional=True)
-        # cannot apply spectral_norm. so, add under line
+        # cannot apply weight_norm. so, add under line
         # https://github.com/pytorch/pytorch/issues/39311
         name_pre = "weight"
         name = name_pre + "_hh_l0"
-        torch_nn.utils.spectral_norm(self.l_blstm, name)
+        torch_nn.utils.weight_norm(self.l_blstm, name)
         name = name_pre + "_ih_l0"
-        torch_nn.utils.spectral_norm(self.l_blstm, name)
+        torch_nn.utils.weight_norm(self.l_blstm, name)
 
     def forward(self, x):
         # permute to (length, batchsize=1, dim)
@@ -96,7 +96,7 @@ class Conv1dKeepLength(torch_nn.Module):
             self.pad_le = dilation_s * (kernel_s - 1) // 2
             self.pad_ri = dilation_s * (kernel_s - 1) - self.pad_le
 
-        self.conv = torch_nn.utils.spectral_norm(
+        self.conv = torch_nn.utils.weight_norm(
             torch_nn.Conv1d(
                 input_dim,
                 output_dim,
@@ -420,7 +420,7 @@ class NeuralFilterBlock(torch_nn.Module):
         self.dilation_s = [np.power(2, x) for x in np.arange(conv_num)]
 
         # ff layer to expand dimension
-        self.l_ff_1 = torch_nn.utils.spectral_norm(
+        self.l_ff_1 = torch_nn.utils.weight_norm(
             torch_nn.Linear(signal_size, hidden_size, bias=False)
         )
         self.l_ff_1_tanh = torch_nn.Tanh()
@@ -435,11 +435,11 @@ class NeuralFilterBlock(torch_nn.Module):
         self.l_convs = torch_nn.ModuleList(tmp)
 
         # ff layer to de-expand dimension
-        self.l_ff_2 = torch_nn.utils.spectral_norm(
+        self.l_ff_2 = torch_nn.utils.weight_norm(
             torch_nn.Linear(hidden_size, hidden_size // 4, bias=False)
         )
         self.l_ff_2_tanh = torch_nn.Tanh()
-        self.l_ff_3 = torch_nn.utils.spectral_norm(
+        self.l_ff_3 = torch_nn.utils.weight_norm(
             torch_nn.Linear(hidden_size // 4, signal_size, bias=False)
         )
         self.l_ff_3_tanh = torch_nn.Tanh()
@@ -779,9 +779,7 @@ class SourceModuleHnNSF(torch_nn.Module):
         )
 
         # to merge source harmonics into a single excitation
-        self.l_linear = torch_nn.utils.spectral_norm(
-            torch_nn.Linear(harmonic_num + 1, 1)
-        )
+        self.l_linear = torch_nn.utils.weight_norm(torch_nn.Linear(harmonic_num + 1, 1))
         self.l_tanh = torch_nn.Tanh()
 
     def forward(self, x):

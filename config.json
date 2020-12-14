@@ -1,13 +1,13 @@
 {
     "train_config": {
-        "checkpoint_dir": "./checkpoints_gan/disc_filterblock/",
-        "log_event_path": "./log_gan/disc_filterblock/fix/",
+        "checkpoint_dir": "./checkpoints_gan/weight_norm/",
+        "log_event_path": "./log_gan/weight_norm/",
         "nepochs": 100,
         "learning_rate": 1e-4,
         "eval_per_step": 5000,
         "generator_step": 400000,
         "discriminator_step": 100000,
-        "checkpoint_path": "./checkpoints_gan/disc_filterblock/checkpoint_step000500000.pth",
+        "checkpoint_path": "./checkpoints_gan/weight_norm/checkpoint_step000050000.pth",
         "seed": 1234,
         "data_mean_std_path": "./1130_lj.pkl"
     },

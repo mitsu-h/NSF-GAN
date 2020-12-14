@@ -6,7 +6,7 @@ usage: train.py [options]
 
 options:
     --config=<json>                 path of configuration parameter [default: ./config.json]
-    --wav_file_path=<path>          path of wav_file [default: F:/Downsample_LJ/]
+    --wav_file_path=<path>          path of wav_file [default: F:/norm_lj/]
     --load_wav_to_memory            Do you want to load all wavefile?
 """
 from docopt import docopt
@@ -81,9 +81,7 @@ def save_checkpoint(
     )
 
     # Discriminator
-    checkpoint_path = join(
-        checkpoint_dir, "discriminator_step{:09d}.pth".format(total_step)
-    )
+    disc_path = join(checkpoint_dir, "discriminator_step{:09d}.pth".format(total_step))
     optimizer_state = discriminator_optim.state_dict()
     torch.save(
         {
@@ -92,7 +90,7 @@ def save_checkpoint(
             "total_step": total_step,
             "epoch": epoch,
         },
-        checkpoint_path,
+        disc_path,
     )
 
     print("Saved checkpoint:", checkpoint_path)
