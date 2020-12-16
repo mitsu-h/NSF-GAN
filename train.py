@@ -236,7 +236,7 @@ def train(
     discriminator = Discriminator().to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-    discriminator_optim = optim.Adam(discriminator.parameters(), lr=learning_rate)
+    discriminator_optim = optim.Adam(discriminator.parameters(), lr=learning_rate / 2)
 
     writer = SummaryWriter(log_event_path)
 
