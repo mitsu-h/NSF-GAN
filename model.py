@@ -1031,10 +1031,11 @@ class Discriminator(torch.nn.Module):
         in_channels=1,
         out_channels=1,
         kernel_size=3,
-        layers=3,
+        layers=5,
         conv_channels=64,
         dilation_factor=1,
         bias=False,
+        use_spectral_norm=True,
     ):
         """Initialize Parallel WaveGAN Discriminator module.
         Args:
@@ -1061,6 +1062,9 @@ class Discriminator(torch.nn.Module):
             self.conv_layers += conv_layer
         # self.last_layer = torch_nn.Linear(in_channels, out_channels, bias=False)
 
+        if use_spectral_norm:
+            self.apply_spectral_norm()
+
     def forward(self, x):
         """Calculate forward propagation.
         Args:
@@ -1073,6 +1077,17 @@ class Discriminator(torch.nn.Module):
             x = f(x, context)
         # return torch.sigmoid(self.last_layer(x))
         return x
+
+    def apply_spectral_norm(self):
+        """Apply spectral normalization module from all of the layers."""
+        import logging
+
+        def _apply_spectral_norm(m):
+            if isinstance(m, torch.nn.Conv1d) or isinstance(m, torch.nn.Linear):
+                torch.nn.utils.spectral_norm(m)
+                logging.debug(f"Spectral norm is applied to {m}.")
+
+        self.apply(_apply_spectral_norm)
 
 
 class Loss:

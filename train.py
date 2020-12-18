@@ -277,7 +277,7 @@ def train(
                 else:
                     adv = discriminator(outputs[0].unsqueeze(-1))
                     adv_loss = criterion.adversarial_loss(adv)
-                    loss = stft_loss + 1 * adv_loss
+                    loss = stft_loss + 4.0 * adv_loss
                 loss.backward()
                 optimizer.step()
             else:
