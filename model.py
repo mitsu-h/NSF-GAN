@@ -868,11 +868,11 @@ class FilterModuleHnSincNSF(torch_nn.Module):
         lp_coef, hp_coef = self.l_sinc_coef(cut_f)
 
         # time-variant filtering
-        har_signal = self.l_tv_filtering(har_component, lp_coef)
+        # har_signal = self.l_tv_filtering(har_component, lp_coef)
         noi_signal = self.l_tv_filtering(noi_component, hp_coef)
 
         # get output
-        return har_signal, noi_signal
+        return har_component, noi_signal
 
 
 ## FOR MODEL
@@ -1013,7 +1013,7 @@ class Model(torch_nn.Module):
         har_signal, noi_signal = self.m_filter(har_source, noi_source, cond_feat, cut_f)
         har_signal = har_signal.squeeze(-1)
         noi_signal = noi_signal.squeeze(-1)
-        output = har_signal + noi_signal
+        output = har_signal
 
         if self.training:
             # just in case we need to penalize the hidden feauture for
