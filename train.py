@@ -31,7 +31,8 @@ import torch.backends.cudnn as cudnn
 
 # my modules
 from dataloader import Wav2MelF0
-from model import Model, Discriminator, Loss
+from model import Model, Loss
+from model import MelGANMultiScaleDiscriminator as Discriminator
 import config as prj_conf
 
 
@@ -275,9 +276,9 @@ def train(
                     loss = stft_loss
                     adv_loss = None
                 else:
-                    adv = discriminator(outputs[0].unsqueeze(-1))
+                    adv = discriminator(outputs[0].unsqueeze(1))
                     adv_loss = criterion.adversarial_loss(adv)
-                    loss = stft_loss + 4.0 * adv_loss
+                    loss = stft_loss + 0.1 * adv_loss
                 loss.backward()
                 optimizer.step()
             else:
@@ -289,8 +290,8 @@ def train(
             if total_step > generator_step:
                 with torch.no_grad():
                     outputs = model(mel, f0)
-                real = discriminator(wav.unsqueeze(-1))
-                fake = discriminator(outputs[0].unsqueeze(-1).detach())
+                real = discriminator(wav.unsqueeze(1))
+                fake = discriminator(outputs[0].unsqueeze(1).detach())
                 real_loss, fake_loss = criterion.discriminator_loss(real, fake)
                 dis_loss = real_loss + fake_loss
                 dis_loss.backward()

@@ -1,13 +1,13 @@
 {
     "train_config": {
-        "checkpoint_dir": "./checkpoints_gan/b-NSF/",
-        "log_event_path": "./log_gan/b-NSF/",
+        "checkpoint_dir": "./checkpoints_gan/mel_gan_disc/",
+        "log_event_path": "./log_gan/mel_gan_disc/",
         "nepochs": 100,
         "learning_rate": 1e-4,
         "eval_per_step": 5000,
         "generator_step": 400000,
         "discriminator_step": 100000,
-        "checkpoint_path": "./checkpoints_gan/b-NSF/checkpoint_step000180000.pth",
+        "checkpoint_path": "./checkpoints_gan/mel_gan_disc/checkpoint_step000500000.pth",
         "seed": 1234,
         "data_mean_std_path": "./1130_lj.pkl"
     },
