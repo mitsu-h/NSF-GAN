@@ -108,7 +108,12 @@ def _load(checkpoint_path):
 
 
 def load_checkpoint(
-    path, model, optimizer, discriminator, discriminator_optim, reset_optimizer=False
+    path,
+    model,
+    optimizer,
+    discriminator=None,
+    discriminator_optim=None,
+    reset_optimizer=False,
 ):
     print("Load checkpoint from: {}".format(path))
     # Generator
@@ -120,18 +125,18 @@ def load_checkpoint(
             print("Load optimizer state from {}".format(path))
             optimizer.load_state_dict(checkpoint["optimizer"])
     # Discriminator
-
-    disc_checkpoint = _load(path.replace("checkpoint_", "discriminator_"))
-    discriminator.load_state_dict(disc_checkpoint["state_dict"])
-    if not reset_optimizer:
-        optimizer_state = disc_checkpoint["optimizer"]
-        if optimizer_state is not None:
-            print(
-                "Load optimizer state from {}".format(
-                    path.replace("checkpoint_", "discriminator_")
+    if discriminator is not None:
+        disc_checkpoint = _load(path.replace("checkpoint_", "discriminator_"))
+        discriminator.load_state_dict(disc_checkpoint["state_dict"])
+        if not reset_optimizer:
+            optimizer_state = disc_checkpoint["optimizer"]
+            if optimizer_state is not None:
+                print(
+                    "Load optimizer state from {}".format(
+                        path.replace("checkpoint_", "discriminator_")
+                    )
                 )
-            )
-            discriminator_optim.load_state_dict(disc_checkpoint["optimizer"])
+                discriminator_optim.load_state_dict(disc_checkpoint["optimizer"])
 
     total_step = checkpoint["total_step"]
     epoch = checkpoint["epoch"]
