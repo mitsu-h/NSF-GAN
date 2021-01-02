@@ -160,220 +160,8 @@ class MovingAverage(Conv1dKeepLength):
 
 
 #
-# FIR filter layer
-class TimeInvFIRFilter(Conv1dKeepLength):
-    """Wrapper to define a FIR filter over Conv1d
-    Note: FIR Filtering is conducted on each dimension (channel)
-    independently: groups=channel_num in conv1d
-    """
-
-    def __init__(self, feature_dim, filter_coef, causal=True, flag_train=False):
-        """__init__(self, feature_dim, filter_coef,
-                 causal=True, flag_train=False)
-        feature_dim: dimension of input data
-        filter_coef: 1-D tensor of filter coefficients
-        causal: FIR is causal or not (default: true)
-        flag_train: whether train the filter coefficients (default false)
-
-        Input data: (batchsize=1, length, feature_dim)
-        Output data: (batchsize=1, length, feature_dim)
-        """
-        super(TimeInvFIRFilter, self).__init__(
-            feature_dim,
-            feature_dim,
-            1,
-            filter_coef.shape[0],
-            causal,
-            groups=feature_dim,
-            bias=False,
-            tanh=False,
-        )
-
-        if filter_coef.ndim == 1:
-            # initialize weight using provided filter_coef
-            with torch.no_grad():
-                tmp_coef = torch.zeros([feature_dim, 1, filter_coef.shape[0]])
-                tmp_coef[:, 0, :] = filter_coef
-                tmp_coef = torch.flip(tmp_coef, dims=[2])
-                self.weight = torch.nn.Parameter(tmp_coef, requires_grad=flag_train)
-        else:
-            print("TimeInvFIRFilter expects filter_coef to be 1-D tensor")
-            print("Please implement the code in __init__ if necessary")
-            sys.exit(1)
-
-    def forward(self, data):
-        return super(TimeInvFIRFilter, self).forward(data)
 
 
-class TimeVarFIRFilter(torch_nn.Module):
-    """TimeVarFIRFilter
-    Given sequences of filter coefficients and a signal, do filtering
-
-    Filter coefs: (batchsize=1, signal_length, filter_order = K)
-    Signal:       (batchsize=1, signal_length, 1)
-
-    For batch 0:
-     For n in [1, sequence_length):
-       output(0, n, 1) = \sum_{k=1}^{K} signal(0, n-k, 1)*coef(0, n, k)
-
-    Note: filter coef (0, n, :) is only used to compute the output
-          at (0, n, 1)
-    """
-
-    def __init__(self):
-        super(TimeVarFIRFilter, self).__init__()
-
-    def forward(self, signal, f_coef):
-        """
-        Filter coefs: (batchsize=1, signal_length, filter_order = K)
-        Signal:       (batchsize=1, signal_length, 1)
-
-        Output:       (batchsize=1, signal_length, 1)
-
-        For n in [1, sequence_length):
-          output(0, n, 1)= \sum_{k=1}^{K} signal(0, n-k, 1)*coef(0, n, k)
-
-        This method may be not efficient:
-
-        Suppose signal [x_1, ..., x_N], filter [a_1, ..., a_K]
-        output         [y_1, y_2, y_3, ..., y_N, *, * ... *]
-               = a_1 * [x_1, x_2, x_3, ..., x_N,   0, ...,   0]
-               + a_2 * [  0, x_1, x_2, x_3, ..., x_N,   0, ...,  0]
-               + a_3 * [  0,   0, x_1, x_2, x_3, ..., x_N, 0, ...,  0]
-        """
-        signal_l = signal.shape[1]
-        order_k = f_coef.shape[-1]
-
-        # pad to (batchsize=1, signal_length + filter_order-1, dim)
-        padded_signal = torch_nn_func.pad(signal, (0, 0, 0, order_k - 1))
-
-        y = torch.zeros_like(signal)
-        # roll and weighted sum, only take [0:signal_length]
-        for k in range(order_k):
-            y += (
-                torch.roll(padded_signal, k, dims=1)[:, 0:signal_l, :]
-                * f_coef[:, :, k : k + 1]
-            )
-        # done
-        return y
-
-
-# Sinc filter generator
-class SincFilter(torch_nn.Module):
-    """SincFilter
-    Given the cut-off-frequency, produce the low-pass and high-pass
-    windowed-sinc-filters.
-    If input cut-off-frequency is (batchsize=1, signal_length, 1),
-    output filter coef is (batchsize=1, signal_length, filter_order).
-    For each time step in [1, signal_length), we calculate one
-    filter for low-pass sinc filter and another for high-pass filter.
-
-    Example:
-    import scipy
-    import scipy.signal
-    import numpy as np
-
-    filter_order = 31
-    cut_f = 0.2
-    sinc_layer = SincFilter(filter_order)
-    lp_coef, hp_coef = sinc_layer(torch.ones(1, 10, 1) * cut_f)
-
-    w, h1 = scipy.signal.freqz(lp_coef[0, 0, :].numpy(), [1])
-    w, h2 = scipy.signal.freqz(hp_coef[0, 0, :].numpy(), [1])
-    plt.plot(w, 20*np.log10(np.abs(h1)))
-    plt.plot(w, 20*np.log10(np.abs(h2)))
-    plt.plot([cut_f * np.pi, cut_f * np.pi], [-100, 0])
-    """
-
-    def __init__(self, filter_order):
-        super(SincFilter, self).__init__()
-        # Make the filter oder an odd number
-        #  [-(M-1)/2, ... 0, (M-1)/2]
-        #
-        self.half_k = (filter_order - 1) // 2
-        self.order = self.half_k * 2 + 1
-
-    def hamming_w(self, n_index):
-        """prepare hamming window for each time step
-        n_index (batchsize=1, signal_length, filter_order)
-            For each time step, n_index will be [-(M-1)/2, ... 0, (M-1)/2]
-            n_index[0, 0, :] = [-(M-1)/2, ... 0, (M-1)/2]
-            n_index[0, 1, :] = [-(M-1)/2, ... 0, (M-1)/2]
-            ...
-        output  (batchsize=1, signal_length, filter_order)
-            output[0, 0, :] = hamming_window
-            output[0, 1, :] = hamming_window
-            ...
-        """
-        # Hamming window
-        return 0.54 + 0.46 * torch.cos(2 * np.pi * n_index / self.order)
-
-    def sinc(self, x):
-        """Normalized sinc-filter sin( pi * x) / pi * x
-        https://en.wikipedia.org/wiki/Sinc_function
-
-        Assume x (batchsize, signal_length, filter_order) and
-        x[0, 0, :] = [-half_order, - half_order+1, ... 0, ..., half_order]
-        x[:, :, self.half_order] -> time index = 0, sinc(0)=1
-        """
-        y = torch.zeros_like(x)
-        y[:, :, 0 : self.half_k] = torch.sin(np.pi * x[:, :, 0 : self.half_k]) / (
-            np.pi * x[:, :, 0 : self.half_k]
-        )
-        y[:, :, self.half_k + 1 :] = torch.sin(np.pi * x[:, :, self.half_k + 1 :]) / (
-            np.pi * x[:, :, self.half_k + 1 :]
-        )
-        y[:, :, self.half_k] = 1
-        return y
-
-    def forward(self, cut_f):
-        """lp_coef, hp_coef = forward(self, cut_f)
-        cut-off frequency cut_f (batchsize=1, length, dim = 1)
-
-        lp_coef: low-pass filter coefs  (batchsize, length, filter_order)
-        hp_coef: high-pass filter coefs (batchsize, length, filter_order)
-        """
-        # create the filter order index
-        with torch.no_grad():
-            # [- (M-1) / 2, ..., 0, ..., (M-1)/2]
-            lp_coef = torch.arange(-self.half_k, self.half_k + 1, device=cut_f.device)
-            # [[[- (M-1) / 2, ..., 0, ..., (M-1)/2],
-            #   [- (M-1) / 2, ..., 0, ..., (M-1)/2],
-            #   ...
-            #  ],
-            #  [[- (M-1) / 2, ..., 0, ..., (M-1)/2],
-            #   [- (M-1) / 2, ..., 0, ..., (M-1)/2],
-            #   ...
-            #  ]]
-            lp_coef = lp_coef.repeat(cut_f.shape[0], cut_f.shape[1], 1)
-
-            hp_coef = torch.arange(-self.half_k, self.half_k + 1, device=cut_f.device)
-            hp_coef = hp_coef.repeat(cut_f.shape[0], cut_f.shape[1], 1)
-
-            # temporary buffer of [-1^n] for gain norm in hp_coef
-            tmp_one = torch.pow(-1, hp_coef)
-
-        # unnormalized filter coefs with hamming window
-        lp_coef = cut_f * self.sinc(cut_f * lp_coef) * self.hamming_w(lp_coef)
-
-        hp_coef = (
-            self.sinc(hp_coef) - cut_f * self.sinc(cut_f * hp_coef)
-        ) * self.hamming_w(hp_coef)
-
-        # normalize the coef to make gain at 0/pi is 0 dB
-        # sum_n lp_coef[n]
-        lp_coef_norm = torch.sum(lp_coef, axis=2).unsqueeze(-1)
-        # sum_n hp_coef[n] * -1^n
-        hp_coef_norm = torch.sum(hp_coef * tmp_one, axis=2).unsqueeze(-1)
-
-        lp_coef = lp_coef / lp_coef_norm
-        hp_coef = hp_coef / hp_coef_norm
-
-        # return normed coef
-        return lp_coef, hp_coef
-
-
-#
 # Up sampling
 class UpSampleLayer(torch_nn.Module):
     """Wrapper over up-sampling
@@ -619,19 +407,19 @@ class SineGen(torch_nn.Module):
 ##
 
 ## For condition module only provide Spectral feature to Filter block
-class CondModuleHnSincNSF(torch_nn.Module):
+class CondModuleBaseNSF(torch_nn.Module):
     """Condition module for hn-sinc-NSF
 
     Upsample and transform input features
-    CondModuleHnSincNSF(input_dimension, output_dimension, up_sample_rate,
+    CondModuleBaseNSF(input_dimension, output_dimension, up_sample_rate,
                blstm_dimension = 64, cnn_kernel_size = 3)
 
-    Spec, F0, cut_off_freq = CondModuleHnSincNSF(features, F0)
+    Spec, F0, cut_off_freq = CondModuleBaseNSF(features, F0)
 
     Both input features should be frame-level features
     If x doesn't contain F0, just ignore the returned F0
 
-    CondModuleHnSincNSF(input_dim, output_dim, up_sample,
+    CondModuleBaseNSF(input_dim, output_dim, up_sample,
                         blstm_s = 64, cnn_kernel_s = 3,
                         voiced_threshold = 0):
 
@@ -652,7 +440,7 @@ class CondModuleHnSincNSF(torch_nn.Module):
         cnn_kernel_s=3,
         voiced_threshold=0,
     ):
-        super(CondModuleHnSincNSF, self).__init__()
+        super(CondModuleBaseNSF, self).__init__()
 
         # input feature dimension
         self.input_dim = input_dim
@@ -682,19 +470,6 @@ class CondModuleHnSincNSF(torch_nn.Module):
         # for sinc filters. Use a larger window to smooth
         self.l_cut_f_smooth = MovingAverage(1, self.cut_f_smooth)
 
-    def get_cut_f(self, hidden_feat, f0):
-        """cut_f = get_cut_f(self, feature, f0)
-        feature: (batchsize, length, dim=1)
-        f0: (batchsize, length, dim=1)
-        """
-        # generate uv signal
-        uv = torch.ones_like(f0) * (f0 > self.voiced_threshold)
-        # hidden_feat is between (-1, 1) after conv1d with tanh
-        # (-0.2, 0.2) + 0.3 = (0.1, 0.5)
-        # voiced:   (0.1, 0.5) + 0.4 = (0.5, 0.9)
-        # unvoiced: (0.1, 0.5) = (0.1, 0.5)
-        return hidden_feat * 0.2 + uv * 0.4 + 0.3
-
     def forward(self, feature, f0):
         """spec, f0 = forward(self, feature, f0)
         feature: (batchsize, length, dim)
@@ -713,24 +488,15 @@ class CondModuleHnSincNSF(torch_nn.Module):
             ),
             dim=2,
         )
-
-        # hidden feature for cut-off frequency
-        hidden_cut_f = tmp[:, :, self.output_dim - 1 :]
-
         # directly up-sample F0 without smoothing
         f0_upsamp = self.l_upsamp_F0(f0)
 
-        # get the cut-off-frequency from output of CNN
-        cut_f = self.get_cut_f(hidden_cut_f, f0_upsamp)
-        # smooth the cut-off-frequency using fixed average smoothing
-        cut_f_smoothed = self.l_cut_f_smooth(cut_f)
-
         # return
-        return context, f0_upsamp, cut_f_smoothed, hidden_cut_f
+        return context, f0_upsamp
 
 
 # For source module
-class SourceModuleHnNSF(torch_nn.Module):
+class SourceModuleBaseNSF(torch_nn.Module):
     """SourceModule for hn-nsf
     SourceModule(sampling_rate, harmonic_num=0, sine_amp=0.1,
                  add_noise_std=0.003, voiced_threshod=0)
@@ -742,7 +508,7 @@ class SourceModuleHnNSF(torch_nn.Module):
         by sine_amp
     voiced_threshold: threhold to set U/V given F0 (default: 0)
 
-    Sine_source, noise_source = SourceModuleHnNSF(F0_sampled)
+    Sine_source, noise_source = SourceModuleBaseNSF(F0_sampled)
     F0_sampled (batchsize, length, 1)
     Sine_source (batchsize, length, 1)
     noise_source (batchsize, length 1)
@@ -758,7 +524,7 @@ class SourceModuleHnNSF(torch_nn.Module):
         voiced_threshod=0,
         flag_for_pulse=False,
     ):
-        super(SourceModuleHnNSF, self).__init__()
+        super(SourceModuleBaseNSF, self).__init__()
 
         self.sine_amp = sine_amp
         self.noise_std = add_noise_std
@@ -779,7 +545,7 @@ class SourceModuleHnNSF(torch_nn.Module):
 
     def forward(self, x):
         """
-        Sine_source, noise_source = SourceModuleHnNSF(F0_sampled)
+        Sine_source, noise_source = SourceModuleBaseNSF(F0_sampled)
         F0_sampled (batchsize, length, 1)
         Sine_source (batchsize, length, 1)
         noise_source (batchsize, length 1)
@@ -787,16 +553,13 @@ class SourceModuleHnNSF(torch_nn.Module):
         # source for harmonic branch
         sine_wavs, uv, _ = self.l_sin_gen(x)
         sine_merge = self.l_tanh(self.l_linear(sine_wavs))
-
-        # source for noise branch, in the same shape as uv
-        noise = torch.randn_like(uv) * self.sine_amp / 3
-        return sine_merge, noise, uv
+        return sine_merge, uv
 
 
 # For Filter module
-class FilterModuleHnSincNSF(torch_nn.Module):
+class FilterModuleBaseNSF(torch_nn.Module):
     """Filter for Hn-sinc-NSF
-    FilterModuleHnSincNSF(signal_size, hidden_size, sinc_order = 31,
+    FilterModuleBaseNSF(signal_size, hidden_size, sinc_order = 31,
                           block_num = 5, kernel_size = 3,
                           conv_num_in_block = 10)
     signal_size: signal dimension (should be 1)
@@ -807,7 +570,7 @@ class FilterModuleHnSincNSF(torch_nn.Module):
     conv_num_in_block: number of d-conv1d in one neural filter block
 
     Usage:
-    output = FilterModuleHnSincNSF(har_source, noi_source, cut_f, context)
+    output = FilterModuleBaseNSF(har_source, noi_source, cut_f, context)
     har_source: source for harmonic branch (batchsize, length, dim=1)
     noi_source: source for noise branch (batchsize, length, dim=1)
     cut_f: cut-off-frequency of sinc filters (batchsize, length, dim=1)
@@ -819,18 +582,16 @@ class FilterModuleHnSincNSF(torch_nn.Module):
         self,
         signal_size,
         hidden_size,
-        sinc_order=31,
         block_num=5,
         kernel_size=3,
         conv_num_in_block=10,
     ):
-        super(FilterModuleHnSincNSF, self).__init__()
+        super(FilterModuleBaseNSF, self).__init__()
         self.signal_size = signal_size
         self.hidden_size = hidden_size
         self.kernel_size = kernel_size
         self.block_num = block_num
         self.conv_num_in_block = conv_num_in_block
-        self.sinc_order = sinc_order
 
         # filter blocks for harmonic branch
         tmp = [
@@ -839,38 +600,14 @@ class FilterModuleHnSincNSF(torch_nn.Module):
         ]
         self.l_har_blocks = torch_nn.ModuleList(tmp)
 
-        # filter blocks for noise branch (only one block, 5 sub-blocks)
-        tmp = [
-            NeuralFilterBlock(
-                signal_size, hidden_size, kernel_size, conv_num_in_block // 2
-            )
-            for x in range(1)
-        ]
-        self.l_noi_blocks = torch_nn.ModuleList(tmp)
-
-        # sinc filter generators and time-variant filtering layer
-        self.l_sinc_coef = SincFilter(self.sinc_order)
-        self.l_tv_filtering = TimeVarFIRFilter()
-        # done
-
-    def forward(self, har_component, noi_component, cond_feat, cut_f):
+    def forward(self, har_component, cond_feat):
         """"""
         # harmonic component
         for l_har_block in self.l_har_blocks:
             har_component = l_har_block(har_component, cond_feat)
-        # noise componebt
-        for l_noi_block in self.l_noi_blocks:
-            noi_component = l_noi_block(noi_component, cond_feat)
-
-        # get sinc filter coefficients
-        lp_coef, hp_coef = self.l_sinc_coef(cut_f)
-
-        # time-variant filtering
-        har_signal = self.l_tv_filtering(har_component, lp_coef)
-        noi_signal = self.l_tv_filtering(noi_component, hp_coef)
 
         # get output
-        return har_signal, noi_signal
+        return har_component
 
 
 ## FOR MODEL
@@ -913,8 +650,6 @@ class Model(torch_nn.Module):
         self.cnn_num_in_block = 10
         # number of harmonic overtones in source
         self.harmonic_num = 9
-        # order of sinc-windowed-FIR-filter
-        self.sinc_order = 31
 
         # upsample mel to match f0 length
         if prj_conf.input_reso[0] != prj_conf.input_reso[1]:
@@ -925,21 +660,20 @@ class Model(torch_nn.Module):
             self.mel_up = None
 
         # the three modules
-        self.m_cond = CondModuleHnSincNSF(
+        self.m_cond = CondModuleBaseNSF(
             self.input_dim,
             self.hidden_dim,
             self.upsamp_rate,
             cnn_kernel_s=self.cnn_kernel_s,
         )
 
-        self.m_source = SourceModuleHnNSF(
+        self.m_source = SourceModuleBaseNSF(
             self.sampling_rate, self.harmonic_num, self.sine_amp, self.noise_std
         )
 
-        self.m_filter = FilterModuleHnSincNSF(
+        self.m_filter = FilterModuleBaseNSF(
             self.output_dim,
             self.hidden_dim,
-            self.sinc_order,
             self.filter_block_num,
             self.cnn_kernel_s,
             self.cnn_num_in_block,
@@ -1000,92 +734,17 @@ class Model(torch_nn.Module):
         # condition module
         # feature-to-filter-block, f0-up-sampled, cut-off-f-for-sinc,
         #  hidden-feature-for-cut-off-f
-        cond_feat, f0_upsamped, cut_f, hid_cut_f = self.m_cond(feat, f0)
+        cond_feat, f0_upsamped = self.m_cond(feat, f0)
 
         # source module
         # harmonic-source, noise-source (for noise branch), uv
-        har_source, noi_source, uv = self.m_source(f0_upsamped)
+        har_source, uv = self.m_source(f0_upsamped)
 
-        # neural filter module (including sinc-based FIR filtering)
+        # neural filter module
         # output
-        har_signal, noi_signal = self.m_filter(har_source, noi_source, cond_feat, cut_f)
-        har_signal = har_signal.squeeze(-1)
-        noi_signal = noi_signal.squeeze(-1)
-        output = har_signal + noi_signal
+        output = self.m_filter(har_source, cond_feat)
 
-        if self.training:
-            # just in case we need to penalize the hidden feauture for
-            # cut-off-freq.
-            return [output, hid_cut_f]
-        else:
-            return output, har_signal, noi_signal
-
-
-class Discriminator(torch.nn.Module):
-    """Parallel WaveGAN Discriminator module."""
-
-    def __init__(
-        self,
-        in_channels=1,
-        out_channels=1,
-        kernel_size=3,
-        layers=5,
-        conv_channels=64,
-        dilation_factor=1,
-        bias=False,
-        use_spectral_norm=True,
-    ):
-        """Initialize Parallel WaveGAN Discriminator module.
-        Args:
-            in_channels (int): Number of input channels.
-            out_channels (int): Number of output channels.
-            kernel_size (int): Number of output channels.
-            layers (int): Number of conv layers.
-            conv_channels (int): Number of chnn layers.
-            dilation_factor (int): Dilation factor. For example, if dilation_factor = 2,
-                the dilation will be 2, 4, 8, ..., and so on.
-            nonlinear_activation (str): Nonlinear function after each conv.
-            nonlinear_activation_params (dict): Nonlinear function parameters
-            bias (bool): Whether to use bias parameter in conv.
-            use_weight_norm (bool) Whether to use weight norm.
-                If set to true, it will be applied to all of the conv layers.
-        """
-        super(Discriminator, self).__init__()
-        assert (kernel_size - 1) % 2 == 0, "Not support even number kernel size."
-        assert dilation_factor > 0, "Dilation factor must be > 0."
-        self.conv_layers = torch.nn.ModuleList()
-        conv_in_channels = in_channels
-        for i in range(layers):
-            conv_layer = [NeuralFilterBlock(conv_in_channels, conv_channels)]
-            self.conv_layers += conv_layer
-        # self.last_layer = torch_nn.Linear(in_channels, out_channels, bias=False)
-
-        if use_spectral_norm:
-            self.apply_spectral_norm()
-
-    def forward(self, x):
-        """Calculate forward propagation.
-        Args:
-            x (Tensor): Input noise signal (B, 1, T).
-        Returns:
-            Tensor: Output tensor (B, 1, T)
-        """
-        context = torch.zeros_like(x)
-        for f in self.conv_layers:
-            x = f(x, context)
-        # return torch.sigmoid(self.last_layer(x))
-        return x
-
-    def apply_spectral_norm(self):
-        """Apply spectral normalization module from all of the layers."""
-        import logging
-
-        def _apply_spectral_norm(m):
-            if isinstance(m, torch.nn.Conv1d) or isinstance(m, torch.nn.Linear):
-                torch.nn.utils.spectral_norm(m)
-                logging.debug(f"Spectral norm is applied to {m}.")
-
-        self.apply(_apply_spectral_norm)
+        return output.squeeze(-1)
 
 
 class MelGANDiscriminator(torch.nn.Module):
@@ -1358,10 +1017,6 @@ class Loss:
         the Loss in torch.tensor format
         Assume output and target as (batchsize=1, length)
         """
-        # hidden-feature for cut-off-frequency
-        cut_f = outputs[1]
-        # generated signal
-        output = outputs[0]
 
         # convert from (batchsize=1, length, dim=1) to (1, length)
         if target.ndim == 3:
@@ -1374,7 +1029,7 @@ class Loss:
         ):
 
             x_stft = torch.stft(
-                output,
+                outputs,
                 fft_p,
                 frame_shift,
                 frame_len,
@@ -1394,13 +1049,6 @@ class Loss:
             x_sp_amp = torch.log(torch.norm(x_stft, 2, -1).pow(2) + self.amp_floor)
             y_sp_amp = torch.log(torch.norm(y_stft, 2, -1).pow(2) + self.amp_floor)
             loss += self.loss(x_sp_amp, y_sp_amp)
-
-        # A norm on cut_f, which forces sinc-cut-off-frequency
-        #  to be close to the U/V-decided value
-        # Experiments on CMU-arctic, ATR-F009, and VCTK don't use it
-        #  by setting self.cutoff_w = 0.0
-        # However, just in case
-        loss += self.cutoff_w * self.loss(cut_f, torch.zeros_like(cut_f))
 
         return loss / 3
 
@@ -1428,6 +1076,6 @@ if __name__ == "__main__":
     model = Model(in_dim=81, out_dim=1, args=None).to(device)
     discriminator = MelGANMultiScaleDiscriminator().to(device)
 
-    mel = torch.randn(1, 1, 80)
-    f0 = torch.randn(1, 1, 1)
+    mel = torch.randn(1, 32000, 80)
+    f0 = torch.randn(1, 32000, 1)
     summary(model, mel, f0)

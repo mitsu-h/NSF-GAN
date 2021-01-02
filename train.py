@@ -154,7 +154,7 @@ def eval_model(step, writer, device, model, eval_data, checkpoint_dir, mel_confi
     model_eval.eval()
 
     with torch.no_grad():
-        output, har_signal, noi_signal = model_eval(mel, f0)
+        output = model_eval(mel, f0)
     # save
     output = output[0].cpu().data.numpy()
     mel_output = librosa.feature.melspectrogram(output, **mel_config)
@@ -188,32 +188,6 @@ def eval_model(step, writer, device, model, eval_data, checkpoint_dir, mel_confi
     # target_wav /= np.max(np.abs(target_wav))
     writer.add_audio(
         "natural audio", target_wav, step, sample_rate=data_config["sampling_rate"]
-    )
-
-    # save other output
-    noi_signal = noi_signal[0].cpu().data.numpy()
-    # ax = save_wavform_fig(noi_signal)
-    fig = plt.figure()
-    librosa.display.waveplot(noi_signal, sr=data_config["sampling_rate"])
-    writer.add_figure("noise signal output", fig, step)
-    plt.close()
-
-    writer.add_image(
-        "noise signal mel spectrogram",
-        prepare_melspec(noi_signal, data_config["mel_config"]),
-        step,
-    )
-
-    har_signal = har_signal[0].cpu().data.numpy()
-    fig = plt.figure()
-    librosa.display.waveplot(har_signal, sr=data_config["sampling_rate"])
-    writer.add_figure("harmonic signal output", fig, step)
-    plt.close()
-
-    writer.add_image(
-        "harmonic signal mel spectrogram",
-        prepare_melspec(har_signal, data_config["mel_config"]),
-        step,
     )
 
 
@@ -274,14 +248,12 @@ def train(
             ):
                 outputs = model(mel, f0)
 
-                stft_loss = criterion.stft_loss(
-                    [outputs[0][:, : wav.size(-1)], outputs[1]], wav
-                )
+                stft_loss = criterion.stft_loss(outputs[:, : wav.size(-1)], wav)
                 if total_step < generator_step:
                     loss = stft_loss
                     adv_loss = None
                 else:
-                    adv = discriminator(outputs[0].unsqueeze(1))
+                    adv = discriminator(outputs.unsqueeze(1))
                     adv_loss = criterion.adversarial_loss(adv)
                     loss = stft_loss + 0.1 * adv_loss
                 loss.backward()
@@ -296,7 +268,7 @@ def train(
                 with torch.no_grad():
                     outputs = model(mel, f0)
                 real = discriminator(wav.unsqueeze(1))
-                fake = discriminator(outputs[0].unsqueeze(1).detach())
+                fake = discriminator(outputs.unsqueeze(1).detach())
                 real_loss, fake_loss = criterion.discriminator_loss(real, fake)
                 dis_loss = real_loss + fake_loss
                 dis_loss.backward()
