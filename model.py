@@ -62,7 +62,7 @@ class BLSTMLayer(torch_nn.Module):
 
 #
 # 1D dilated convolution that keep the input/output length
-class Conv1dKeepLength(torch_nn.Module):
+class Conv1dKeepLength(torch_nn.Conv1d):
     """Wrapper for causal convolution
     Input tensor:  (batchsize=1, length, dim_in)
     Output tensor: (batchsize=1, length, dim_out)
@@ -83,7 +83,16 @@ class Conv1dKeepLength(torch_nn.Module):
         tanh=True,
         pad_mode="constant",
     ):
-        super(Conv1dKeepLength, self).__init__()
+        super(Conv1dKeepLength, self).__init__(
+            input_dim,
+            output_dim,
+            kernel_s,
+            stride=stride,
+            padding=0,
+            dilation=dilation_s,
+            groups=groups,
+            bias=bias,
+        )
 
         self.pad_mode = pad_mode
 
@@ -97,17 +106,6 @@ class Conv1dKeepLength(torch_nn.Module):
             # pad on both sizes
             self.pad_le = dilation_s * (kernel_s - 1) // 2
             self.pad_ri = dilation_s * (kernel_s - 1) - self.pad_le
-
-        self.conv = torch_nn.Conv1d(
-            input_dim,
-            output_dim,
-            kernel_s,
-            stride=stride,
-            padding=0,
-            dilation=dilation_s,
-            groups=groups,
-            bias=bias,
-        )
 
         if tanh:
             self.l_ac = torch_nn.Tanh()
@@ -127,7 +125,7 @@ class Conv1dKeepLength(torch_nn.Module):
         ).squeeze(2)
         # tanh(conv1())
         # permmute back to (batchsize=1, length, dim)
-        output = self.l_ac(self.conv(x))
+        output = self.l_ac(super(Conv1dKeepLength, self).forward(x))
         return output.permute(0, 2, 1)
 
 
@@ -152,7 +150,7 @@ class MovingAverage(Conv1dKeepLength):
             pad_mode=pad_mode,
         )
         # set the weighting coefficients
-        torch_nn.init.constant_(self.conv.weight, 1 / window_len)
+        torch_nn.init.constant_(self.weight, 1 / window_len)
         # turn off grad for this layer
         for p in self.parameters():
             p.requires_grad = False
@@ -868,11 +866,11 @@ class FilterModuleHnSincNSF(torch_nn.Module):
         lp_coef, hp_coef = self.l_sinc_coef(cut_f)
 
         # time-variant filtering
-        # har_signal = self.l_tv_filtering(har_component, lp_coef)
+        har_signal = self.l_tv_filtering(har_component, lp_coef)
         noi_signal = self.l_tv_filtering(noi_component, hp_coef)
 
         # get output
-        return har_component, noi_signal
+        return har_signal, noi_signal
 
 
 ## FOR MODEL
@@ -1013,7 +1011,7 @@ class Model(torch_nn.Module):
         har_signal, noi_signal = self.m_filter(har_source, noi_source, cond_feat, cut_f)
         har_signal = har_signal.squeeze(-1)
         noi_signal = noi_signal.squeeze(-1)
-        output = har_signal
+        output = har_signal + noi_signal
 
         if self.training:
             # just in case we need to penalize the hidden feauture for
@@ -1422,4 +1420,14 @@ class Loss:
 
 
 if __name__ == "__main__":
-    print("Definition of model")
+    from torchsummary import summary
+
+    use_cuda = torch.cuda.is_available()
+    device = torch.device("cuda" if use_cuda else "cpu")
+
+    model = Model(in_dim=81, out_dim=1, args=None).to(device)
+    discriminator = MelGANMultiScaleDiscriminator().to(device)
+
+    mel = torch.randn(1, 1, 80)
+    f0 = torch.randn(1, 1, 1)
+    summary(model, mel, f0)
