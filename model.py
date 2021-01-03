@@ -108,7 +108,7 @@ class Conv1dKeepLength(torch_nn.Conv1d):
             self.pad_ri = dilation_s * (kernel_s - 1) - self.pad_le
 
         if tanh:
-            self.l_ac = torch_nn.Tanh()
+            self.l_ac = torch_nn.LeakyReLU(negative_slope=0.2)
         else:
             self.l_ac = torch_nn.Identity()
 
@@ -208,7 +208,7 @@ class NeuralFilterBlock(torch_nn.Module):
         # ff layer to expand dimension
         self.l_ff_1 = torch_nn.Linear(signal_size, hidden_size, bias=False)
 
-        self.l_ff_1_tanh = torch_nn.Tanh()
+        self.l_ff_1_tanh = torch_nn.LeakyReLU(negative_slope=0.2)
 
         # dilated conv layers
         tmp = [
@@ -222,10 +222,10 @@ class NeuralFilterBlock(torch_nn.Module):
         # ff layer to de-expand dimension
         self.l_ff_2 = torch_nn.Linear(hidden_size, hidden_size // 4, bias=False)
 
-        self.l_ff_2_tanh = torch_nn.Tanh()
+        self.l_ff_2_tanh = torch_nn.LeakyReLU(negative_slope=0.2)
         self.l_ff_3 = torch_nn.Linear(hidden_size // 4, signal_size, bias=False)
 
-        self.l_ff_3_tanh = torch_nn.Tanh()
+        self.l_ff_3_tanh = torch_nn.LeakyReLU(negative_slope=0.2)
 
         # a simple scale
         self.scale = torch_nn.Parameter(torch.tensor([0.1]), requires_grad=False)
@@ -541,7 +541,7 @@ class SourceModuleBaseNSF(torch_nn.Module):
 
         # to merge source harmonics into a single excitation
         self.l_linear = torch_nn.Linear(harmonic_num + 1, 1)
-        self.l_tanh = torch_nn.Tanh()
+        self.l_tanh = torch_nn.LeakyReLU(negative_slope=0.2)
 
     def forward(self, x):
         """
@@ -678,8 +678,8 @@ class Model(torch_nn.Module):
             self.cnn_kernel_s,
             self.cnn_num_in_block,
         )
-        # done
-        return
+        # apply weight norm
+        self.apply_weight_norm()
 
     def prepare_mean_std(self, in_dim, out_dim, args, data_mean_std=None):
         """"""
@@ -745,6 +745,26 @@ class Model(torch_nn.Module):
         output = self.m_filter(har_source, cond_feat)
 
         return output.squeeze(-1)
+
+    def remove_weight_norm(self):
+        """Remove weight normalization module from all of the layers."""
+
+        def _remove_weight_norm(m):
+            try:
+                torch.nn.utils.remove_weight_norm(m)
+            except ValueError:  # this module didn't have weight norm
+                return
+
+        self.apply(_remove_weight_norm)
+
+    def apply_weight_norm(self):
+        """Apply weight normalization module from all of the layers."""
+
+        def _apply_weight_norm(m):
+            if isinstance(m, torch.nn.Conv1d) or isinstance(m, torch.nn.Linear):
+                torch.nn.utils.weight_norm(m)
+
+        self.apply(_apply_weight_norm)
 
 
 class MelGANDiscriminator(torch.nn.Module):

@@ -151,6 +151,7 @@ def eval_model(step, writer, device, model, eval_data, checkpoint_dir, mel_confi
     # prepare model for evaluation
     model_eval = Model(in_dim=81, out_dim=1, args=None).to(device)
     model_eval.load_state_dict(model.state_dict())
+    model_eval.remove_weight_norm()
     model_eval.eval()
 
     with torch.no_grad():
