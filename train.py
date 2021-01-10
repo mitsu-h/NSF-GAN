@@ -217,13 +217,14 @@ def train(
     discriminator = Discriminator().to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-    discriminator_optim = optim.Adam(discriminator.parameters(), lr=learning_rate / 2)
+    discriminator_optim = optim.Adam(discriminator.parameters(), lr=learning_rate)
 
     writer = SummaryWriter(log_event_path)
 
     # train
     epoch = 1
     total_step = 0
+    current_lr = learning_rate
 
     os.makedirs(checkpoint_dir, exist_ok=True)
 
@@ -237,6 +238,14 @@ def train(
         for step, (wav, mel, f0) in tqdm(enumerate(train_loader)):
             model.train()
             discriminator.train()
+            # configから操作できるようにはしたい
+            if total_step > 0 and current_lr > 1e-6 and total_step % 100000 == 0:
+                current_lr = current_lr / 2
+                for g_param_group, d_param_group in zip(
+                    optimizer.param_groups, discriminator_optim.param_groups
+                ):
+                    g_param_group["lr"] = current_lr
+                    d_param_group["lr"] = current_lr
             optimizer.zero_grad()
             discriminator_optim.zero_grad()
 
@@ -256,7 +265,7 @@ def train(
                 else:
                     adv = discriminator(outputs.unsqueeze(1))
                     adv_loss = criterion.adversarial_loss(adv)
-                    loss = stft_loss + 0.1 * adv_loss
+                    loss = stft_loss + 0.5 * adv_loss
                 loss.backward()
                 optimizer.step()
             else:
@@ -286,6 +295,7 @@ def train(
                 writer.add_scalar("dis_loss", float(dis_loss.item()), total_step)
                 writer.add_scalar("real_loss", float(real_loss.item()), total_step)
                 writer.add_scalar("fake_loss", float(fake_loss.item()), total_step)
+            writer.add_scalar("learning_rate", current_lr, total_step)
             total_step += 1
             # running_loss += loss.item()
 

@@ -1,13 +1,13 @@
 {
     "train_config": {
-        "checkpoint_dir": "./checkpoints_gan/weight_norm_and_leakyReLU/",
-        "log_event_path": "./log_gan/weight_norm_and_leakyReLU/",
+        "checkpoint_dir": "./checkpoints_gan/tanh_weight_morm/",
+        "log_event_path": "./log_gan/tanh_weight_norm/",
         "nepochs": 100,
         "learning_rate": 1e-4,
-        "eval_per_step": 5000,
-        "generator_step": 100000,
-        "discriminator_step": 100000,
-        "checkpoint_path": "./checkpoints_gan/weight_norm_and_leakyReLU/checkpoint_step000385000.pth",
+        "eval_per_step": 10000,
+        "generator_step": 200000,
+        "discriminator_step": 0,
+        "checkpoint_path": "checkpoints_gan/tanh_weight_morm/checkpoint_step000080000.pth",
         "seed": 1234,
         "data_mean_std_path": "./1130_lj.pkl"
     },

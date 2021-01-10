@@ -44,13 +44,11 @@ class BLSTMLayer(torch_nn.Module):
         self.l_blstm = torch_nn.LSTM(input_dim, output_dim // 2, bidirectional=True)
         # cannot apply weight_norm. so, add under line
         # https://github.com/pytorch/pytorch/issues/39311
-        """
         name_pre = "weight"
         name = name_pre + "_hh_l0"
         torch_nn.utils.weight_norm(self.l_blstm, name)
         name = name_pre + "_ih_l0"
         torch_nn.utils.weight_norm(self.l_blstm, name)
-        """
 
     def forward(self, x):
         # permute to (length, batchsize=1, dim)
@@ -62,7 +60,7 @@ class BLSTMLayer(torch_nn.Module):
 
 #
 # 1D dilated convolution that keep the input/output length
-class Conv1dKeepLength(torch_nn.Conv1d):
+class Conv1dKeepLength(torch_nn.Module):
     """Wrapper for causal convolution
     Input tensor:  (batchsize=1, length, dim_in)
     Output tensor: (batchsize=1, length, dim_out)
@@ -83,16 +81,7 @@ class Conv1dKeepLength(torch_nn.Conv1d):
         tanh=True,
         pad_mode="constant",
     ):
-        super(Conv1dKeepLength, self).__init__(
-            input_dim,
-            output_dim,
-            kernel_s,
-            stride=stride,
-            padding=0,
-            dilation=dilation_s,
-            groups=groups,
-            bias=bias,
-        )
+        super(Conv1dKeepLength, self).__init__()
 
         self.pad_mode = pad_mode
 
@@ -107,8 +96,19 @@ class Conv1dKeepLength(torch_nn.Conv1d):
             self.pad_le = dilation_s * (kernel_s - 1) // 2
             self.pad_ri = dilation_s * (kernel_s - 1) - self.pad_le
 
+        self.conv = torch_nn.Conv1d(
+            input_dim,
+            output_dim,
+            kernel_s,
+            stride=stride,
+            padding=0,
+            dilation=dilation_s,
+            groups=groups,
+            bias=bias,
+        )
+
         if tanh:
-            self.l_ac = torch_nn.LeakyReLU(negative_slope=0.2)
+            self.l_ac = torch_nn.Tanh()
         else:
             self.l_ac = torch_nn.Identity()
 
@@ -125,7 +125,7 @@ class Conv1dKeepLength(torch_nn.Conv1d):
         ).squeeze(2)
         # tanh(conv1())
         # permmute back to (batchsize=1, length, dim)
-        output = self.l_ac(super(Conv1dKeepLength, self).forward(x))
+        output = self.l_ac(self.conv(x))
         return output.permute(0, 2, 1)
 
 
@@ -150,7 +150,7 @@ class MovingAverage(Conv1dKeepLength):
             pad_mode=pad_mode,
         )
         # set the weighting coefficients
-        torch_nn.init.constant_(self.weight, 1 / window_len)
+        torch_nn.init.constant_(self.conv.weight, 1 / window_len)
         # turn off grad for this layer
         for p in self.parameters():
             p.requires_grad = False
@@ -206,26 +206,26 @@ class NeuralFilterBlock(torch_nn.Module):
         self.dilation_s = [np.power(2, x) for x in np.arange(conv_num)]
 
         # ff layer to expand dimension
-        self.l_ff_1 = torch_nn.Linear(signal_size, hidden_size, bias=False)
+        self.l_ff_1 = torch_nn.Linear(signal_size, hidden_size, bias=True)
 
-        self.l_ff_1_tanh = torch_nn.LeakyReLU(negative_slope=0.2)
+        self.l_ff_1_tanh = torch_nn.Tanh()
 
         # dilated conv layers
         tmp = [
             Conv1dKeepLength(
-                hidden_size, hidden_size, x, kernel_size, causal=True, bias=False
+                hidden_size, hidden_size, x, kernel_size, causal=True, bias=True
             )
             for x in self.dilation_s
         ]
         self.l_convs = torch_nn.ModuleList(tmp)
 
         # ff layer to de-expand dimension
-        self.l_ff_2 = torch_nn.Linear(hidden_size, hidden_size // 4, bias=False)
+        self.l_ff_2 = torch_nn.Linear(hidden_size, hidden_size // 4, bias=True)
 
-        self.l_ff_2_tanh = torch_nn.LeakyReLU(negative_slope=0.2)
-        self.l_ff_3 = torch_nn.Linear(hidden_size // 4, signal_size, bias=False)
+        self.l_ff_2_tanh = torch_nn.Tanh()
+        self.l_ff_3 = torch_nn.Linear(hidden_size // 4, signal_size, bias=True)
 
-        self.l_ff_3_tanh = torch_nn.LeakyReLU(negative_slope=0.2)
+        self.l_ff_3_tanh = torch_nn.Tanh()
 
         # a simple scale
         self.scale = torch_nn.Parameter(torch.tensor([0.1]), requires_grad=False)
@@ -541,7 +541,7 @@ class SourceModuleBaseNSF(torch_nn.Module):
 
         # to merge source harmonics into a single excitation
         self.l_linear = torch_nn.Linear(harmonic_num + 1, 1)
-        self.l_tanh = torch_nn.LeakyReLU(negative_slope=0.2)
+        self.l_tanh = torch_nn.Tanh()
 
     def forward(self, x):
         """
@@ -1024,11 +1024,8 @@ class Loss:
         # floor in log-spectrum-amplitude calculating
         self.amp_floor = 0.00001
         # loss function
-        self.loss = torch_nn.MSELoss()
+        self.loss = torch_nn.L1Loss()
         self.gan_loss = torch_nn.MSELoss()  # BCELoss()
-        # weight to penalize hidden features for cut-off-frequency
-        # for experiments on CMU-arctic, ATR-F009, VCTK, cutoff_w = 0.0
-        self.cutoff_w = 0.0
 
         self.device = device
 
@@ -1056,6 +1053,7 @@ class Loss:
                 window=self.win(frame_len, device=self.device),
                 onesided=True,
                 pad_mode="constant",
+                return_complex=True,
             )
             y_stft = torch.stft(
                 target,
@@ -1065,9 +1063,17 @@ class Loss:
                 window=self.win(frame_len, device=self.device),
                 onesided=True,
                 pad_mode="constant",
+                return_complex=True,
             )
-            x_sp_amp = torch.log(torch.norm(x_stft, 2, -1).pow(2) + self.amp_floor)
-            y_sp_amp = torch.log(torch.norm(y_stft, 2, -1).pow(2) + self.amp_floor)
+            x_stft = torch.abs(x_stft)
+            y_stft = torch.abs(y_stft)
+
+            # spectral convergence
+            loss += torch.norm(y_stft - x_stft) / torch.norm(y_stft)
+
+            # log STFT magnitude loss
+            x_sp_amp = torch.log(x_stft + self.amp_floor)
+            y_sp_amp = torch.log(y_stft + self.amp_floor)
             loss += self.loss(x_sp_amp, y_sp_amp)
 
         return loss / 3
