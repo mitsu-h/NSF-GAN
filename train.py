@@ -6,7 +6,7 @@ usage: train.py [options]
 
 options:
     --config=<json>                 path of configuration parameter [default: ./config.json]
-    --wav_file_path=<path>          path of wav_file [default: F:/norm_lj/]
+    --wav_file_path=<path>          path of wav_file [default: F:/Downsample_LJ/]
     --load_wav_to_memory            Do you want to load all wavefile?
 """
 from docopt import docopt
@@ -55,6 +55,22 @@ def prepare_melspec(wav, mel_config):
     mel = np.log(np.abs(mel).clip(1e-5, 10)).astype(np.float32)
     mel = prepare_spec_image(mel)
     return mel.transpose(2, 0, 1)
+
+
+def compare_waveform(
+    output, target, step, sr=16000, writer=None, prop_label="proposal"
+):
+    cmap = plt.get_cmap("tab10")
+    fig = plt.figure()
+    librosa.display.waveplot(target, sr, x_axis="s", label="natural", color=cmap(1))
+    librosa.display.waveplot(output, sr, x_axis="s", label=prop_label, color=cmap(0))
+    plt.ylabel("amplitude")
+    plt.legend()
+    if writer is not None:
+        writer.add_figure("compare_waveform", fig, step)
+    else:
+        fig.savefig(f"compare_waveform_step{step}.png")
+    plt.close()
 
 
 def save_checkpoint(
@@ -170,7 +186,8 @@ def eval_model(step, writer, device, model, eval_data, checkpoint_dir, mel_confi
     writer.add_image("target wav mel spectrogram", mel.transpose(2, 0, 1), step)
 
     fig = plt.figure()
-    librosa.display.waveplot(output, sr=data_config["sampling_rate"])
+    librosa.display.waveplot(output, sr=data_config["sampling_rate"], x_axis="s")
+    plt.ylabel("amplitude")
     writer.add_figure("output", fig, step)
     plt.close()
     # output /= np.max(np.abs(output))
@@ -183,13 +200,16 @@ def eval_model(step, writer, device, model, eval_data, checkpoint_dir, mel_confi
     # save natural audio
     target_wav = target_wav.cpu().data.numpy()
     fig = plt.figure()
-    librosa.display.waveplot(target_wav, sr=data_config["sampling_rate"])
+    librosa.display.waveplot(target_wav, sr=data_config["sampling_rate"], x_axis="s")
     writer.add_figure("target", fig, step)
     plt.close()
     # target_wav /= np.max(np.abs(target_wav))
     writer.add_audio(
         "natural audio", target_wav, step, sample_rate=data_config["sampling_rate"]
     )
+
+    # save compare waveform
+    compare_waveform(output, target_wav, step, writer=writer)
 
 
 def train(

@@ -762,7 +762,7 @@ class Model(torch_nn.Module):
 
         def _apply_weight_norm(m):
             if isinstance(m, torch.nn.Conv1d) or isinstance(m, torch.nn.Linear):
-                torch.nn.utils.weight_norm(m)
+                torch.nn.utils.weight_norm(m, dim=None)
 
         self.apply(_apply_weight_norm)
 
@@ -1024,7 +1024,7 @@ class Loss:
         # floor in log-spectrum-amplitude calculating
         self.amp_floor = 0.00001
         # loss function
-        self.loss = torch_nn.L1Loss()
+        self.loss = torch_nn.MSELoss()
         self.gan_loss = torch_nn.MSELoss()  # BCELoss()
 
         self.device = device
