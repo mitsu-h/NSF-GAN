@@ -1,7 +1,7 @@
 {
     "train_config": {
-        "checkpoint_dir": "./checkpoints_gan/stft_mse/",
-        "log_event_path": "./log_gan/stft_mse/",
+        "checkpoint_dir": "./model/mel_16k/",
+        "log_event_path": "./log_gan/mel_16k/",
         "nepochs": 100,
         "learning_rate": 1e-4,
         "eval_per_step": 5000,
@@ -9,7 +9,7 @@
         "discriminator_step": 0,
         "checkpoint_path": "",
         "seed": 1234,
-        "data_mean_std_path": "./1130_lj.pkl"
+        "data_mean_std_path": "./mel_16k.pkl"
     },
     "network_config": {
         "wavenet_config": {
@@ -37,6 +37,7 @@
         "sampling_rate": 16000,
         "f0_frame_period": 5.0,
         "mel_config": {
+            "sr": 16000,
             "n_fft": 1024,
             "win_length": 400,
             "hop_length": 80,

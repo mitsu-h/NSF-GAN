@@ -6,7 +6,7 @@ usage: train.py [options]
 
 options:
     --config=<json>                 path of configuration parameter [default: ./config.json]
-    --wav_file_path=<path>          path of wav_file [default: F:/Downsample_LJ/]
+    --wav_file_path=<path>          path of wav_file [default: F:/norm_lj/]
     --load_wav_to_memory            Do you want to load all wavefile?
 """
 from docopt import docopt
@@ -285,7 +285,7 @@ def train(
                 else:
                     adv = discriminator(outputs.unsqueeze(1))
                     adv_loss = criterion.adversarial_loss(adv)
-                    loss = stft_loss + 0.5 * adv_loss
+                    loss = stft_loss + 0.1 * adv_loss
                 loss.backward()
                 optimizer.step()
             else:

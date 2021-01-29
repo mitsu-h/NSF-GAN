@@ -44,11 +44,13 @@ class BLSTMLayer(torch_nn.Module):
         self.l_blstm = torch_nn.LSTM(input_dim, output_dim // 2, bidirectional=True)
         # cannot apply weight_norm. so, add under line
         # https://github.com/pytorch/pytorch/issues/39311
+        """
         name_pre = "weight"
         name = name_pre + "_hh_l0"
         torch_nn.utils.weight_norm(self.l_blstm, name)
         name = name_pre + "_ih_l0"
         torch_nn.utils.weight_norm(self.l_blstm, name)
+        """
 
     def forward(self, x):
         # permute to (length, batchsize=1, dim)
@@ -678,8 +680,6 @@ class Model(torch_nn.Module):
             self.cnn_kernel_s,
             self.cnn_num_in_block,
         )
-        # apply weight norm
-        self.apply_weight_norm()
 
     def prepare_mean_std(self, in_dim, out_dim, args, data_mean_std=None):
         """"""
@@ -1069,7 +1069,7 @@ class Loss:
             y_stft = torch.abs(y_stft)
 
             # spectral convergence
-            loss += torch.norm(y_stft - x_stft) / torch.norm(y_stft)
+            # loss += torch.norm(y_stft - x_stft) / torch.norm(y_stft)
 
             # log STFT magnitude loss
             x_sp_amp = torch.log(x_stft + self.amp_floor)
