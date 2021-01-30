@@ -25,7 +25,7 @@ import pickle
 
 from dataloader import Wav2MelF0
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = docopt(__doc__)
     wav_file_path = args["--wav_file_path"]
     load_wav_to_memory = args["--load_wav_to_memory"]
@@ -33,11 +33,11 @@ if __name__ == '__main__':
     with open(args["--config"]) as f:
         data = f.read()
     config = json.loads(data)
-    print('start training:')
+    print("start training:")
     data_config = config["data_config"]
     dataloader_config = config["dataloader_config"]
     wav_data = Wav2MelF0(wav_file_path, load_wav_to_memory, **data_config)
-
+    wav_data.val_wav = wav_data.train_wav
     wav, mel, f0 = wav_data.get_all_length_data(0)
     wav_mean = torch.mean(wav)
     wav_var = torch.var(wav)
@@ -65,8 +65,8 @@ if __name__ == '__main__':
     wav_mean = wav_mean.data.numpy()
     wav_std = wav_std.data.numpy()
     cond_mean = np.append(mel_mean.data.numpy()[0], f0_mean.data.numpy()[0])
-    cond_std = np.append(mel_std.data.numpy()[0] , f0_std.data.numpy()[0])
+    cond_std = np.append(mel_std.data.numpy()[0], f0_std.data.numpy()[0])
 
     data_mean_std = [cond_mean, cond_std, wav_mean[np.newaxis], wav_std[np.newaxis]]
-    with open(save_path, 'wb') as f:
+    with open(save_path, "wb") as f:
         pickle.dump(data_mean_std, f)
