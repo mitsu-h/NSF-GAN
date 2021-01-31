@@ -252,6 +252,7 @@ def train(
         model, discriminator, total_step, epoch = load_checkpoint(
             checkpoint_path, model, optimizer, discriminator, discriminator_optim
         )
+        current_lr = optimizer.param_groups[0]["lr"]
     while epoch <= nepochs:
         running_loss = 0
         print("{}epoch:".format(epoch))
