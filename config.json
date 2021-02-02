@@ -1,11 +1,11 @@
 {
     "train_config": {
         "checkpoint_dir": "./model/mel_16k/",
-        "log_event_path": "./log_gan/mel_16k/",
+        "log_event_path": "./log_gan/mel_16k/pow_abs/",
         "nepochs": 100,
         "learning_rate": 1e-4,
         "eval_per_step": 5000,
-        "generator_step": 200000,
+        "generator_step": 400000,
         "discriminator_step": 0,
         "checkpoint_path": "",
         "seed": 1234,

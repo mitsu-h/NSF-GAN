@@ -208,24 +208,24 @@ class NeuralFilterBlock(torch_nn.Module):
         self.dilation_s = [np.power(2, x) for x in np.arange(conv_num)]
 
         # ff layer to expand dimension
-        self.l_ff_1 = torch_nn.Linear(signal_size, hidden_size, bias=True)
+        self.l_ff_1 = torch_nn.Linear(signal_size, hidden_size, bias=False)
 
         self.l_ff_1_tanh = torch_nn.Tanh()
 
         # dilated conv layers
         tmp = [
             Conv1dKeepLength(
-                hidden_size, hidden_size, x, kernel_size, causal=True, bias=True
+                hidden_size, hidden_size, x, kernel_size, causal=True, bias=False
             )
             for x in self.dilation_s
         ]
         self.l_convs = torch_nn.ModuleList(tmp)
 
         # ff layer to de-expand dimension
-        self.l_ff_2 = torch_nn.Linear(hidden_size, hidden_size // 4, bias=True)
+        self.l_ff_2 = torch_nn.Linear(hidden_size, hidden_size // 4, bias=False)
 
         self.l_ff_2_tanh = torch_nn.Tanh()
-        self.l_ff_3 = torch_nn.Linear(hidden_size // 4, signal_size, bias=True)
+        self.l_ff_3 = torch_nn.Linear(hidden_size // 4, signal_size, bias=False)
 
         self.l_ff_3_tanh = torch_nn.Tanh()
 
@@ -1065,8 +1065,8 @@ class Loss:
                 pad_mode="constant",
                 return_complex=True,
             )
-            x_stft = torch.abs(x_stft)
-            y_stft = torch.abs(y_stft)
+            x_stft = torch.abs(x_stft).pow(2)
+            y_stft = torch.abs(y_stft).pow(2)
 
             # spectral convergence
             # loss += torch.norm(y_stft - x_stft) / torch.norm(y_stft)
