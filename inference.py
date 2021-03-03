@@ -65,6 +65,7 @@ def infer_test(model_path, wav_file_path, dataset, save_dir):
     device = torch.device("cuda" if use_cuda else "cpu")
     model = Model(in_dim=81, out_dim=1, args=None).to(device)
     model, _, _, _ = load_checkpoint(model_path, model, None, reset_optimizer=True)
+    model.remove_weight_norm()
     model.eval()
 
     with open(join(wav_file_path, "test_list.txt"), "rb") as f:
@@ -76,7 +77,7 @@ def infer_test(model_path, wav_file_path, dataset, save_dir):
         mel = mel.to(device)
         f0 = f0.to(device)
         with torch.no_grad():
-            output, _, _ = model(mel, f0)
+            output = model(mel, f0)
 
         output = output[0].squeeze().cpu().data.numpy()
         os.makedirs(save_dir, exist_ok=True)

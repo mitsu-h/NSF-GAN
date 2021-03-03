@@ -1,13 +1,13 @@
 {
     "train_config": {
-        "checkpoint_dir": "./model/mel_16k/",
-        "log_event_path": "./log_gan/mel_16k/pow_abs/",
+        "checkpoint_dir": "./model/weight_norm/",
+        "log_event_path": "./log_gan/mel_16k/weight_norm/",
         "nepochs": 100,
         "learning_rate": 1e-4,
         "eval_per_step": 5000,
-        "generator_step": 400000,
+        "generator_step": 200000,
         "discriminator_step": 0,
-        "checkpoint_path": "",
+        "checkpoint_path": "model/weight_norm/checkpoint_step000185000.pth",
         "seed": 1234,
         "data_mean_std_path": "./mel_16k.pkl"
     },
