@@ -7,37 +7,53 @@
         "eval_per_step": 5000,
         "generator_step": 200000,
         "discriminator_step": 0,
-        "checkpoint_path": "model/weight_norm/checkpoint_step000185000.pth",
-        "seed": 1234,
-        "data_mean_std_path": "./mel_16k.pkl"
+        "lambda_adv": 0.1,
+        "checkpoint_path": "",
+        "seed": 1234
     },
     "network_config": {
-        "wavenet_config": {
-            "out_channels":256,
-            "layers":10,
-            "stacks":1,
-            "residual_channels":512,
-            "gate_channels":512,
-            "skip_out_channels":512,
-            "kernel_size":3,
-            "dropout":0.05,
-            "cin_channels":80,
-            "gin_channels":-1,
-            "n_speakers":null,
-            "upsample_conditional_features":false,
-            "upsample_net":"ConvInUpsampleNetwork",
-            "upsample_params":{"upsample_scales": [4, 4, 4, 4]},
-            "scalar_input":false,
-            "use_speaker_embedding":false,
-            "cin_pad":0
-                 }
+        "nsf_config": {
+            "in_dim": 81,
+            "out_dim": 1,
+            "sine_amp": 0.1,
+            "noise_std": 0.003,
+            "hidden_dim": 64,
+            "upsamp_rate": 80,
+            "sampling_rate": 16000,
+            "cnn_kernel_s": 3,
+            "filter_block_num": 5,
+            "cnn_num_in_block": 10,
+            "harmonic_num": 9,
+            "mean_std_path": "./mean_std_pkl/mel_16k.pkl"
+        },
+        "discriminator_config": {
+            "in_channels":1,
+            "out_channels":1,
+            "scales":3,
+            "downsample_pooling":"AvgPool1d",
+            "downsample_pooling_params":{
+                "kernel_size": 4,
+                "stride": 2,
+                "padding": 1,
+                "count_include_pad": false
+            },
+            "kernel_sizes":[5, 3],
+            "channels":16,
+            "max_downsample_channels":1024,
+            "bias":true,
+            "downsample_scales":[4, 4, 4, 4],
+            "nonlinear_activation":"LeakyReLU",
+            "nonlinear_activation_params":{"negative_slope": 0.2},
+            "pad":"ReflectionPad1d",
+            "pad_params":{},
+            "use_weight_norm":true
+        }
     },
     "data_config": {
         "segment_length": 32767,
         "sampling_rate": 16000,
         "f0_frame_period": 5.0,
         "mel_config": {
-            "sr": 16000,
             "n_fft": 1024,
             "win_length": 400,
             "hop_length": 80,
@@ -53,5 +69,11 @@
         "batch_size": 1,
         "pin_memory": true,
         "drop_last": true
+    },
+    "loss_config": {
+        "frame_hops": [80, 40, 640],
+        "frame_lens": [320, 80, 1920],
+        "fft_n": [512, 128, 2048],
+        "amp_floor": 0.00001
     }
 }

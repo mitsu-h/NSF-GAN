@@ -33,7 +33,6 @@ import torch.backends.cudnn as cudnn
 from dataloader import Wav2MelF0
 from model import Model, Loss
 from model import MelGANMultiScaleDiscriminator as Discriminator
-import config as prj_conf
 
 
 use_cuda = torch.cuda.is_available()
@@ -50,20 +49,24 @@ def prepare_spec_image(spectrogram):
     return np.uint8(cm.magma(spectrogram) * 255)
 
 
-def prepare_melspec(wav, mel_config):
-    mel = librosa.feature.melspectrogram(wav, **mel_config)
+def prepare_melspec(wav, sampling_rate, mel_config):
+    mel = librosa.feature.melspectrogram(wav, sampling_rate, **mel_config)
     mel = np.log(np.abs(mel).clip(1e-5, 10)).astype(np.float32)
     mel = prepare_spec_image(mel)
     return mel.transpose(2, 0, 1)
 
 
 def compare_waveform(
-    output, target, step, sr=16000, writer=None, prop_label="proposal"
+    output, target, step, sampling_rate=16000, writer=None, prop_label="proposal"
 ):
     cmap = plt.get_cmap("tab10")
     fig = plt.figure()
-    librosa.display.waveplot(target, sr, x_axis="s", label="natural", color=cmap(1))
-    librosa.display.waveplot(output, sr, x_axis="s", label=prop_label, color=cmap(0))
+    librosa.display.waveplot(
+        target, sampling_rate, x_axis="s", label="natural", color=cmap(1)
+    )
+    librosa.display.waveplot(
+        output, sampling_rate, x_axis="s", label=prop_label, color=cmap(0)
+    )
     plt.ylabel("amplitude")
     plt.legend()
     if writer is not None:
@@ -186,7 +189,9 @@ def eval_model(step, writer, device, model, eval_data, checkpoint_dir, mel_confi
     writer.add_image("target wav mel spectrogram", mel.transpose(2, 0, 1), step)
 
     fig = plt.figure()
-    librosa.display.waveplot(output, sr=data_config["sampling_rate"], x_axis="s")
+    librosa.display.waveplot(
+        output, sampling_rate=data_config["sampling_rate"], x_axis="s"
+    )
     plt.ylabel("amplitude")
     writer.add_figure("output", fig, step)
     plt.close()
@@ -195,12 +200,14 @@ def eval_model(step, writer, device, model, eval_data, checkpoint_dir, mel_confi
         "predicted audio signal", output, step, sample_rate=data_config["sampling_rate"]
     )
     path = join(checkpoint_dir, "predicted_signal_checkpoint{}.wav".format(step))
-    librosa.output.write_wav(path, output, sr=data_config["sampling_rate"])
+    librosa.output.write_wav(path, output, sampling_rate=data_config["sampling_rate"])
 
     # save natural audio
     target_wav = target_wav.cpu().data.numpy()
     fig = plt.figure()
-    librosa.display.waveplot(target_wav, sr=data_config["sampling_rate"], x_axis="s")
+    librosa.display.waveplot(
+        target_wav, sampling_rate=data_config["sampling_rate"], x_axis="s"
+    )
     writer.add_figure("target", fig, step)
     plt.close()
     # target_wav /= np.max(np.abs(target_wav))
@@ -222,19 +229,17 @@ def train(
     eval_per_step,
     generator_step,
     discriminator_step,
+    lambda_adv,
     checkpoint_path,
     seed,
-    data_mean_std_path,
 ):
     torch.manual_seed(seed)
     device = torch.device("cuda" if use_cuda else "cpu")
-    criterion = Loss(device)
+    criterion = Loss(device, **loss_config)
 
     # Model
-    with open(data_mean_std_path, "rb") as f:
-        data_mean_std = pickle.load(f)
-    model = Model(in_dim=81, out_dim=1, args=None, mean_std=data_mean_std).to(device)
-    discriminator = Discriminator().to(device)
+    model = Model(**network_config["nsf_config"]).to(device)
+    discriminator = Discriminator(**network_config["discriminator_config"]).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     discriminator_optim = optim.Adam(discriminator.parameters(), lr=learning_rate)
@@ -286,7 +291,7 @@ def train(
                 else:
                     adv = discriminator(outputs.unsqueeze(1))
                     adv_loss = criterion.adversarial_loss(adv)
-                    loss = stft_loss + 0.1 * adv_loss
+                    loss = stft_loss + lambda_adv * adv_loss
                 loss.backward()
                 optimizer.step()
             else:
@@ -361,8 +366,10 @@ if __name__ == "__main__":
     data_config = config["data_config"]
     dataloader_config = config["dataloader_config"]
     train_config = config["train_config"]
-    global wavenet_config
-    wavenet_config = config["network_config"]["wavenet_config"]
+    global network_config
+    network_config = config["network_config"]
+    global loss_config
+    loss_config = config["loss_config"]
     dataset = Wav2MelF0(wav_file_path, load_wav_to_memory, **data_config)
     train_loader = DataLoader(dataset, **dataloader_config)
     train(dataset, train_loader, **train_config)

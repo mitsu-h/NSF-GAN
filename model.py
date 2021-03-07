@@ -10,10 +10,10 @@ from __future__ import print_function
 
 import sys
 import numpy as np
+import pickle
 import torch
 import torch.nn as torch_nn
 import torch.nn.functional as torch_nn_func
-import config as prj_conf
 import torch.fft
 
 __author__ = "Xin Wang"
@@ -615,14 +615,28 @@ class FilterModuleBaseNSF(torch_nn.Module):
 class Model(torch_nn.Module):
     """Model definition"""
 
-    def __init__(self, in_dim, out_dim, args, mean_std=None):
+    def __init__(
+        self,
+        in_dim,
+        out_dim,
+        sine_amp=0.1,
+        noise_std=0.003,
+        hidden_dim=64,
+        upsamp_rate=80,
+        sampling_rate=16000,
+        cnn_kernel_s=3,
+        filter_block_num=5,
+        cnn_num_in_block=10,
+        harmonic_num=9,
+        mean_std_path=None,
+    ):
         super(Model, self).__init__()
 
         torch.manual_seed(1)
         # mean std of input and output
-        in_m, in_s, out_m, out_s = self.prepare_mean_std(
-            in_dim, out_dim, args, mean_std
-        )
+        with open(mean_std_path, "rb") as f:
+            mean_std = pickle.load(f)
+        in_m, in_s, out_m, out_s = self.prepare_mean_std(in_dim, out_dim, mean_std)
         self.input_mean = torch_nn.Parameter(in_m, requires_grad=False)
         self.input_std = torch_nn.Parameter(in_s, requires_grad=False)
         self.output_mean = torch_nn.Parameter(out_m, requires_grad=False)
@@ -632,33 +646,24 @@ class Model(torch_nn.Module):
 
         # configurations
         # amplitude of sine waveform (for each harmonic)
-        self.sine_amp = 0.1
+        self.sine_amp = sine_amp
         # standard deviation of Gaussian noise for additive noise
-        self.noise_std = 0.003
+        self.noise_std = noise_std
         # dimension of hidden features in filter blocks
-        self.hidden_dim = 64
+        self.hidden_dim = hidden_dim
         # upsampling rate on input acoustic features (16kHz * 5ms = 80)
-        self.upsamp_rate = prj_conf.input_reso[1]
+        self.upsamp_rate = upsamp_rate
         # sampling rate (Hz)
-        # TODO:config.pyとconfig.jsonを統合する
-        self.sampling_rate = prj_conf.wav_samp_rate
+        self.sampling_rate = sampling_rate
         # CNN kernel size in filter blocks
-        self.cnn_kernel_s = 3
+        self.cnn_kernel_s = cnn_kernel_s
         # number of filter blocks (for harmonic branch)
         # noise branch only uses 1 block
-        self.filter_block_num = 5
+        self.filter_block_num = filter_block_num
         # number of dilated CNN in each filter block
-        self.cnn_num_in_block = 10
+        self.cnn_num_in_block = cnn_num_in_block
         # number of harmonic overtones in source
-        self.harmonic_num = 9
-
-        # upsample mel to match f0 length
-        if prj_conf.input_reso[0] != prj_conf.input_reso[1]:
-            self.mel_up = UpSampleLayer(
-                80, prj_conf.input_reso[0] / prj_conf.input_reso[1]
-            )
-        else:
-            self.mel_up = None
+        self.harmonic_num = harmonic_num
 
         # the three modules
         self.m_cond = CondModuleBaseNSF(
@@ -682,7 +687,7 @@ class Model(torch_nn.Module):
 
         self.apply_weight_norm()
 
-    def prepare_mean_std(self, in_dim, out_dim, args, data_mean_std=None):
+    def prepare_mean_std(self, in_dim, out_dim, data_mean_std=None):
         """"""
         if data_mean_std is not None:
             in_m = torch.from_numpy(data_mean_std[0])
@@ -726,9 +731,6 @@ class Model(torch_nn.Module):
         Assume x (batchsize=1, length, dim)
         Return output(batchsize=1, length)
         """
-        # upsample mel to match f0 length
-        if self.mel_up is not None:
-            mel = self.mel_up(mel)[:, : f0.size(1), :]
         # normalize the input features data
         feat = self.normalize_input(torch.cat([mel, f0], dim=2))
 
@@ -1012,21 +1014,27 @@ class MelGANMultiScaleDiscriminator(torch.nn.Module):
 class Loss:
     """Wrapper to define loss function"""
 
-    def __init__(self, device):
+    def __init__(
+        self,
+        device,
+        frame_hops=[80, 40, 640],
+        frame_lens=[320, 80, 1920],
+        fft_n=[512, 128, 2048],
+        amp_floor=0.00001,
+    ):
         """"""
         # frame shift (number of points)
-        self.frame_hops = [80, 40, 640]
+        self.frame_hops = frame_hops
         # frame length
-        self.frame_lens = [320, 80, 1920]
+        self.frame_lens = frame_lens
         # fft length
-        self.fft_n = [512, 128, 2048]
+        self.fft_n = fft_n
         # window type in stft
         self.win = torch.hann_window
         # floor in log-spectrum-amplitude calculating
-        self.amp_floor = 0.00001
+        self.amp_floor = amp_floor
         # loss function
         self.loss = torch_nn.MSELoss()
-        self.gan_loss = torch_nn.MSELoss()  # BCELoss()
 
         self.device = device
 
@@ -1083,7 +1091,7 @@ class Loss:
         adv_loss = 0
         for scale in fake:
             adv_loss += -scale[-1].mean()
-        return adv_loss  # self.gan_loss(fake, fake.new_ones(fake.size()))
+        return adv_loss
 
     def discriminator_loss(self, real, fake):
         real_loss = 0
