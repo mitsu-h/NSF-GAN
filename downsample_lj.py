@@ -1,6 +1,6 @@
 # coding: utf-8
 """
-test dataloader
+downsample wavfile from 22050 to 16000
 
 usage: dataloader.py [options]
 
@@ -23,7 +23,7 @@ import os
 from tqdm import tqdm
 from dataloader import print_config_data
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = docopt(__doc__)
     wav_file_path = args["--wav_file_path"]
     output_dir = args["--output_dir"]
@@ -32,8 +32,8 @@ if __name__ == '__main__':
         data = f.read()
     config = json.loads(data)
     print_config_data(config)
-    
-    down_sr = 16000 #現状固定
+
+    down_sr = 16000  # 現状固定
     wav_file_path = glob(wav_file_path)
     for wav_path in tqdm(wav_file_path):
         wav, sr = librosa.load(wav_path)

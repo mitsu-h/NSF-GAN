@@ -1,10 +1,4 @@
 #!/usr/bin/env python
-"""
-model.py for harmonic-plus-noise NSF with trainable sinc filter
-
-version: 9
-
-"""
 from __future__ import absolute_import
 from __future__ import print_function
 
@@ -15,11 +9,6 @@ import torch
 import torch.nn as torch_nn
 import torch.nn.functional as torch_nn_func
 import torch.fft
-
-__author__ = "Xin Wang"
-__email__ = "wangxin@nii.ac.jp"
-__copyright__ = "Copyright 2020, Xin Wang"
-
 
 ##############
 # Building blocks (torch.nn modules + dimension operation)
@@ -415,7 +404,7 @@ class CondModuleBaseNSF(torch_nn.Module):
     CondModuleBaseNSF(input_dimension, output_dimension, up_sample_rate,
                blstm_dimension = 64, cnn_kernel_size = 3)
 
-    Spec, F0, cut_off_freq = CondModuleBaseNSF(features, F0)
+    Spec, F0 = CondModuleBaseNSF(features, F0)
 
     Both input features should be frame-level features
     If x doesn't contain F0, just ignore the returned F0
@@ -549,7 +538,6 @@ class SourceModuleBaseNSF(torch_nn.Module):
         Sine_source, noise_source = SourceModuleBaseNSF(F0_sampled)
         F0_sampled (batchsize, length, 1)
         Sine_source (batchsize, length, 1)
-        noise_source (batchsize, length 1)
         """
         # source for harmonic branch
         sine_wavs, uv, _ = self.l_sin_gen(x)
@@ -559,23 +547,19 @@ class SourceModuleBaseNSF(torch_nn.Module):
 
 # For Filter module
 class FilterModuleBaseNSF(torch_nn.Module):
-    """Filter for Hn-sinc-NSF
+    """Filter for b-NSF
     FilterModuleBaseNSF(signal_size, hidden_size, sinc_order = 31,
                           block_num = 5, kernel_size = 3,
                           conv_num_in_block = 10)
     signal_size: signal dimension (should be 1)
     hidden_size: dimension of hidden features inside neural filter block
-    sinc_order: order of the sinc filter
     block_num: number of neural filter blocks in harmonic branch
     kernel_size: kernel size in dilated CNN
     conv_num_in_block: number of d-conv1d in one neural filter block
 
     Usage:
     output = FilterModuleBaseNSF(har_source, noi_source, cut_f, context)
-    har_source: source for harmonic branch (batchsize, length, dim=1)
-    noi_source: source for noise branch (batchsize, length, dim=1)
-    cut_f: cut-off-frequency of sinc filters (batchsize, length, dim=1)
-    context: hidden features to be added (batchsize, length, dim)
+    cond_feat: hidden features to be added (batchsize, length, dim)
     output: (batchsize, length, dim=1)
     """
 
@@ -688,7 +672,7 @@ class Model(torch_nn.Module):
         self.apply_weight_norm()
 
     def prepare_mean_std(self, in_dim, out_dim, data_mean_std=None):
-        """"""
+        """prepare mean std for standrization"""
         if data_mean_std is not None:
             in_m = torch.from_numpy(data_mean_std[0])
             in_s = torch.from_numpy(data_mean_std[1])
@@ -1108,9 +1092,9 @@ if __name__ == "__main__":
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
 
-    model = Model(in_dim=81, out_dim=1, args=None).to(device)
+    model = Model(in_dim=81, out_dim=1).to(device)
     discriminator = MelGANMultiScaleDiscriminator().to(device)
 
-    mel = torch.randn(1, 32000, 80)
-    f0 = torch.randn(1, 32000, 1)
+    mel = torch.randn(1, 32767, 80)
+    f0 = torch.randn(1, 32767, 1)
     summary(model, mel, f0)
