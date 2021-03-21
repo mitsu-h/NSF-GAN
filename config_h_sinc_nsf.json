@@ -1,0 +1,56 @@
+{
+    "train_config": {
+        "checkpoint_dir": "./h-sinc-nsf/test/",
+        "log_event_path": "./log_h/test/",
+        "nepochs": 100,
+        "learning_rate": 1e-4,
+        "eval_per_step": 5000,
+        "checkpoint_path": "",
+        "seed": 1234
+    },
+    "network_config": {
+        "nsf_config": {
+            "in_dim": 81,
+            "out_dim": 1,
+            "sine_amp": 0.1,
+            "noise_std": 0.003,
+            "hidden_dim": 64,
+            "upsamp_rate": 80,
+            "sampling_rate": 16000,
+            "cnn_kernel_s": 3,
+            "filter_block_num": 5,
+            "cnn_num_in_block": 10,
+            "harmonic_num": 9,
+            "sinc_order": 31,
+            "mean_std_path": "./mean_std_pkl/mel_16k.pkl"
+        }
+    },
+    "data_config": {
+        "segment_length": 32767,
+        "sampling_rate": 16000,
+        "f0_frame_period": 5.0,
+        "mel_config": {
+            "n_fft": 1024,
+            "win_length": 400,
+            "hop_length": 80,
+            "n_mels": 80,
+            "fmin": 0.0,
+            "fmax": 8000.0,
+            "power": 1.0
+        }
+    },
+    "dataloader_config": {
+        "num_workers": 4,
+        "shuffle": true,
+        "batch_size": 1,
+        "pin_memory": true,
+        "drop_last": true
+    },
+    "loss_config": {
+        "cutoff_w": 0.0,
+        "frame_hops": [80, 40, 640],
+        "frame_lens": [320, 80, 1920],
+        "fft_n": [512, 128, 2048],
+        "amp_floor": 0.00001
+    }
+}
