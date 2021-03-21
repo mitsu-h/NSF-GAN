@@ -1,6 +1,6 @@
 # coding: utf-8
 """
-train VDE_wavenet
+train NSF-GAN
 
 usage: train.py [options]
 
@@ -168,7 +168,7 @@ def eval_model(step, writer, device, model, eval_data, checkpoint_dir, mel_confi
     mel, f0 = mel.to(device), f0.to(device)
 
     # prepare model for evaluation
-    model_eval = Model(in_dim=81, out_dim=1, args=None).to(device)
+    model_eval = Model(**network_config["nsf_config"]).to(device)
     model_eval.load_state_dict(model.state_dict())
     model_eval.remove_weight_norm()
     model_eval.eval()
@@ -177,7 +177,9 @@ def eval_model(step, writer, device, model, eval_data, checkpoint_dir, mel_confi
         output = model_eval(mel, f0)
     # save
     output = output[0].cpu().data.numpy()
-    mel_output = librosa.feature.melspectrogram(output, **mel_config)
+    mel_output = librosa.feature.melspectrogram(
+        output, data_config["sampling_rate"], **mel_config
+    )
     mel_output = np.log(np.abs(mel_output).clip(1e-5, 10)).astype(np.float32)
     mel_output = prepare_spec_image(mel_output)
     writer.add_image(

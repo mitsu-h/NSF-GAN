@@ -46,7 +46,7 @@ def infer(mel, f0, model_path, data_mean_std_path="downsample_lj_mean_std.pkl"):
     mel, f0 = mel.to(device), f0.to(device)
     with open(data_mean_std_path, "rb") as f:
         data_mean_std = pickle.load(f)
-    model = Model(in_dim=81, out_dim=1, args=None, mean_std=data_mean_std).to(device)
+    model = Model(**network_config["nsf_config"]).to(device)
     model, _, _ = load_checkpoint(model_path, model, None, reset_optimizer=True)
     model.eval()
 
@@ -61,19 +61,15 @@ def infer(mel, f0, model_path, data_mean_std_path="downsample_lj_mean_std.pkl"):
     return output, mel_output
 
 
-def infer_test(model_path, wav_file_path, dataset, save_dir):
+def infer_test(model_path, dataset, save_dir):
     device = torch.device("cuda" if use_cuda else "cpu")
-    model = Model(in_dim=81, out_dim=1, args=None).to(device)
+    model = Model(**network_config["nsf_config"]).to(device)
     model, _, _, _ = load_checkpoint(model_path, model, None, reset_optimizer=True)
     model.remove_weight_norm()
     model.eval()
 
-    with open(join(wav_file_path, "test_list.txt"), "rb") as f:
-        test_wav = pickle.load(f)
-    dataset.val_wav = test_wav
-
-    for idx in tqdm(range(len(test_wav))):
-        wav, mel, f0 = dataset.get_all_length_data(idx)
+    for idx in tqdm(range(len(dataset.test_wav))):
+        wav, mel, f0 = dataset.get_all_length_data(idx, is_test=True)
         mel = mel.to(device)
         f0 = f0.to(device)
         with torch.no_grad():
@@ -82,7 +78,7 @@ def infer_test(model_path, wav_file_path, dataset, save_dir):
         output = output[0].squeeze().cpu().data.numpy()
         os.makedirs(save_dir, exist_ok=True)
         check_point_name = os.path.splitext(os.path.basename(model_path))[0]
-        save_name = check_point_name + "_" + test_wav[idx]
+        save_name = check_point_name + "_" + dataset.test_wav[idx]
         save_path = os.path.join(save_dir, save_name)
         librosa.output.write_wav(
             save_path, output[: wav.size(0)], sr=data_config["sampling_rate"]
@@ -104,9 +100,11 @@ if __name__ == "__main__":
     data_config = config["data_config"]
     dataloader_config = config["dataloader_config"]
     train_config = config["train_config"]
+    global network_config
+    network_config = config["network_config"]
     dataset = Wav2MelF0(wav_file_path, False, **data_config)
 
-    infer_test(checkpoint_path, wav_file_path, dataset, save_dir)
+    infer_test(checkpoint_path, dataset, save_dir)
 
     """
     wav, mel, f0 = dataset.get_all_length_data(0)
