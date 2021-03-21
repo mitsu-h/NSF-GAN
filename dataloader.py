@@ -48,11 +48,26 @@ class Wav2MelF0(torch.utils.data.Dataset):
             self.train_wav = pickle.load(f)
         with open(join(wav_file_path, "val_list.txt"), "rb") as f:
             self.val_wav = pickle.load(f)
+        with open(join(wav_file_path, "test_list.txt"), "rb") as f:
+            self.test_wav = pickle.load(f)
 
         self.sampling_rate = sampling_rate
         self.segment_length = segment_length
         self.f0_frame_period = f0_frame_period
         self.mel_config = mel_config
+
+    def make_mel_f0(self, wav):
+        # make mel-spectrogram
+        mel = librosa.feature.melspectrogram(wav, self.sampling_rate, **self.mel_config)
+        mel = np.log(np.abs(mel).clip(1e-5, 10)).astype(np.float32)
+        # make fundamental frequency
+        wav = wav.astype(np.float)
+        _f0, t = pw.dio(wav, self.sampling_rate, frame_period=self.f0_frame_period)
+        f0 = pw.stonemask(wav, _f0, t, self.sampling_rate)
+        wav = torch.from_numpy(wav.astype(np.float32))
+        mel = torch.from_numpy(mel).T
+        f0 = torch.from_numpy(f0.astype(np.float32)).unsqueeze(-1)
+        return wav, mel, f0
 
     def __getitem__(self, idx):
         wav = librosa.load(
@@ -66,42 +81,27 @@ class Wav2MelF0(torch.utils.data.Dataset):
         else:
             wav = np.pad(wav, [0, self.segment_length - wav_length], mode="constant")
 
-        # make mel-spectrogram
-        mel = librosa.feature.melspectrogram(wav, self.sampling_rate, **self.mel_config)
-        mel = np.log(np.abs(mel).clip(1e-5, 10)).astype(np.float32)
-        # make fundamental frequency
-        wav = wav.astype(np.float)
-        # wav = np.pad(wav, [0, mel.shape[1] * self.hop_length - self.segment_length], mode='constant').astype(np.float)
-        _f0, t = pw.dio(wav, self.sampling_rate, frame_period=self.f0_frame_period)
-        f0 = pw.stonemask(wav, _f0, t, self.sampling_rate)
-        # cond = np.append(mel, [f0.astype(np.float32)], axis=0)
-        wav = torch.from_numpy(wav.astype(np.float32))
-        # cond = torch.from_numpy(cond.T)
-        mel = torch.from_numpy(mel).T
-        f0 = torch.from_numpy(f0.astype(np.float32)).unsqueeze(-1)
+        wav, mel, f0 = self.make_mel_f0(wav)
 
         return (wav, mel, f0)
 
     def __len__(self):
         return len(self.train_wav)
 
-    def get_all_length_data(self, idx):
-        wav = librosa.load(
-            join(self.wav_file_dir, self.val_wav[idx]), sr=self.sampling_rate
-        )[0]
-        # make mel-spectrogram
-        mel = librosa.feature.melspectrogram(wav, self.sampling_rate, **self.mel_config)
-        mel = np.log(np.abs(mel).clip(1e-5, 10)).astype(np.float32)
-        # make fundamental frequency
-        wav = wav.astype(np.float)
-        _f0, t = pw.dio(wav, self.sampling_rate, frame_period=self.f0_frame_period)
-        f0 = pw.stonemask(wav, _f0, t, self.sampling_rate)[: mel.shape[1]]
-        mel = mel[:, : len(f0)]
-        cond = np.append(mel, [f0.astype(np.float32)], axis=0)
-        wav = torch.from_numpy(wav.astype(np.float32))
-        # cond = torch.from_numpy(cond.T).unsqueeze(0)
-        mel = torch.from_numpy(mel).T.unsqueeze(0)
-        f0 = torch.from_numpy(f0.astype(np.float32)).unsqueeze(-1).unsqueeze(0)
+    def get_all_length_data(self, idx, is_test=False):
+        if not is_test:
+            wav = librosa.load(
+                join(self.wav_file_dir, self.val_wav[idx]), sr=self.sampling_rate
+            )[0]
+
+        else:
+            wav = librosa.load(
+                join(self.wav_file_dir, self.test_wav[idx]), sr=self.sampling_rate
+            )[0]
+
+        wav, mel, f0 = self.make_mel_f0(wav)
+        mel = mel.unsqueeze(0)
+        f0 = f0.unsqueeze(0)
 
         return (wav, mel, f0)
 
