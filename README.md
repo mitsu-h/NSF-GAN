@@ -11,7 +11,16 @@ b-NSFをGeneratorに，DiscriminatorにMelGANのMulti-scale Discriminatorを採�
 - [NSF](https://github.com/mitsu-h/project-NN-Pytorch-scripts)
 - [MelGANのDiscriminator](https://github.com/kan-bayashi/ParallelWaveGAN)
 ## Requirements
-
+- tqdm==4.45.0
+- matplotlib==3.1.0
+- pyworld==0.2.8
+- librosa==0.7.2
+- numpy==1.16.4
+- torch==1.7.0
+- torch_summary==1.4.5
+- docopt==0.6.2
+- Pillow==8.1.2
+- torchsummary==1.5.1
 # Usage
 ## 音声データのダウンロード
 本研究ではLJSpeech Datasetを使用した．\
